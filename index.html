@@ -10,6 +10,21 @@
     <canvas id="gameCanvas"></canvas>
 
     <aside class="hud left">
+      <details class="panel instructions">
+        <summary>How to Play</summary>
+        <ul>
+          <li>Move with <strong>WASD</strong> or <strong>Arrow Keys</strong>.</li>
+          <li>Aim with mouse, shoot with <strong>Space</strong> or left-click.</li>
+          <li>Destroy asteroids: <strong>+2</strong> points.</li>
+          <li>Avoid asteroids: <strong>+1</strong> point.</li>
+          <li>Hit <span class="life-dot"></span> life planets to recover 1 life.</li>
+          <li>Hit <span class="weapon-dot"></span> weapon planets to refill ammo.</li>
+          <li>3 consecutive asteroid collisions = <strong>Game Over</strong>.</li>
+        </ul>
+      </details>
+    </aside>
+
+    <aside class="hud right">
       <div class="panel">
         <h2>Ship Status</h2>
         <div class="status-row">
@@ -28,21 +43,6 @@
         </div>
       </div>
 
-      <div class="panel instructions">
-        <h3>How to Play</h3>
-        <ul>
-          <li>Move with <strong>WASD</strong> or <strong>Arrow Keys</strong>.</li>
-          <li>Aim with mouse, shoot with <strong>Space</strong> or left-click.</li>
-          <li>Destroy asteroids: <strong>+2</strong> points.</li>
-          <li>Avoid asteroids: <strong>+1</strong> point.</li>
-          <li>Hit <span class="life-dot"></span> life planets to recover 1 life.</li>
-          <li>Hit <span class="weapon-dot"></span> weapon planets to refill ammo.</li>
-          <li>3 consecutive asteroid collisions = <strong>Game Over</strong>.</li>
-        </ul>
-      </div>
-    </aside>
-
-    <aside class="hud right">
       <div class="panel score">
         <h2>Score</h2>
         <p id="scoreText">0</p>

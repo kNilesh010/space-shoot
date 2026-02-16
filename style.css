@@ -39,12 +39,12 @@ body {
 
 .hud.left {
   left: 16px;
-  width: min(370px, 30vw);
+  width: min(320px, 26vw);
 }
 
 .hud.right {
   right: 16px;
-  width: min(240px, 25vw);
+  width: min(360px, 30vw);
 }
 
 .panel {
@@ -61,6 +61,28 @@ body {
   margin: 0 0 8px;
   color: var(--accent);
   letter-spacing: 0.4px;
+}
+
+.instructions summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+  list-style: none;
+}
+
+.instructions summary::-webkit-details-marker {
+  display: none;
+}
+
+.instructions summary::after {
+  content: "Expand";
+  float: right;
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.instructions[open] summary::after {
+  content: "Collapse";
 }
 
 .status-row {
@@ -170,13 +192,13 @@ button {
 
 @media (max-width: 900px) {
   .hud.left {
-    width: min(420px, calc(100vw - 32px));
+    width: min(240px, 56vw);
   }
 
   .hud.right {
     top: auto;
     bottom: 12px;
     right: 12px;
-    width: min(220px, 55vw);
+    width: min(320px, 72vw);
   }
 }

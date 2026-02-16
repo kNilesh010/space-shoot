@@ -76,10 +76,12 @@ function spawnAsteroid() {
   const radius =
     config.asteroidMinRadius +
     Math.random() * (config.asteroidMaxRadius - config.asteroidMinRadius);
+  const profile = createAsteroidProfile(radius);
   gameState.asteroids.push({
     x: canvas.width + radius + 40,
     y: radius + Math.random() * (canvas.height - radius * 2),
     radius,
+    profile,
     speed: 130 + Math.random() * 70 + difficulty * 18,
     drift: (Math.random() - 0.5) * 80,
     rotation: Math.random() * Math.PI * 2,
@@ -88,6 +90,34 @@ function spawnAsteroid() {
 
   const baseDelay = Math.max(0.35, 1.6 - gameState.elapsed * 0.025);
   gameState.asteroidSpawnTimer = baseDelay + Math.random() * 0.7;
+}
+
+function createAsteroidProfile(radius) {
+  const points = [];
+  const pointCount = 14 + Math.floor(Math.random() * 8);
+  for (let i = 0; i < pointCount; i++) {
+    const angle = (Math.PI * 2 * i) / pointCount;
+    const jitter = 0.68 + Math.random() * 0.38;
+    points.push({
+      x: Math.cos(angle) * radius * jitter,
+      y: Math.sin(angle) * radius * jitter,
+    });
+  }
+
+  const craterCount = 2 + Math.floor(Math.random() * 3);
+  const craters = [];
+  for (let i = 0; i < craterCount; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const dist = radius * (0.15 + Math.random() * 0.45);
+    const r = radius * (0.12 + Math.random() * 0.14);
+    craters.push({
+      x: Math.cos(ang) * dist,
+      y: Math.sin(ang) * dist,
+      r,
+    });
+  }
+
+  return { points, craters };
 }
 
 function spawnPlanet(type) {
@@ -445,20 +475,49 @@ function drawEntities() {
     ctx.rotate(asteroid.rotation);
 
     ctx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const ang = (Math.PI * 2 * i) / 10;
-      const r = asteroid.radius * (0.78 + Math.sin(i * 2.4 + asteroid.rotation) * 0.12);
-      const x = Math.cos(ang) * r;
-      const y = Math.sin(ang) * r;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+    const { points, craters } = asteroid.profile;
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
     }
     ctx.closePath();
     const grd = ctx.createLinearGradient(-asteroid.radius, -asteroid.radius, asteroid.radius, asteroid.radius);
-    grd.addColorStop(0, "#a38e7b");
-    grd.addColorStop(1, "#54453d");
+    grd.addColorStop(0, "#b7a38d");
+    grd.addColorStop(0.45, "#8e7462");
+    grd.addColorStop(1, "#4c3c33");
     ctx.fillStyle = grd;
     ctx.fill();
+
+    ctx.lineWidth = Math.max(1.5, asteroid.radius * 0.06);
+    ctx.strokeStyle = "rgba(38,27,22,0.55)";
+    ctx.stroke();
+
+    const rim = ctx.createRadialGradient(
+      -asteroid.radius * 0.2,
+      -asteroid.radius * 0.3,
+      asteroid.radius * 0.1,
+      0,
+      0,
+      asteroid.radius * 1.1
+    );
+    rim.addColorStop(0, "rgba(255,241,220,0.28)");
+    rim.addColorStop(1, "rgba(255,241,220,0)");
+    ctx.fillStyle = rim;
+    ctx.fill();
+
+    for (const crater of craters) {
+      ctx.beginPath();
+      ctx.arc(crater.x, crater.y, crater.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(44,31,26,0.3)";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(crater.x - crater.r * 0.28, crater.y - crater.r * 0.28, crater.r * 0.45, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,232,198,0.08)";
+      ctx.fill();
+    }
+
     ctx.restore();
   }
 
