@@ -1,0 +1,182 @@
+:root {
+  --panel-bg: rgba(8, 13, 30, 0.72);
+  --panel-border: rgba(132, 186, 255, 0.32);
+  --text: #e8f2ff;
+  --accent: #8dcbff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at 20% 20%, #1d2248, #090c1c 60%, #05060d);
+}
+
+#gameCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hud {
+  position: fixed;
+  top: 16px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hud.left {
+  left: 16px;
+  width: min(370px, 30vw);
+}
+
+.hud.right {
+  right: 16px;
+  width: min(240px, 25vw);
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 0 30px rgba(60, 110, 255, 0.15), inset 0 0 22px rgba(90, 170, 255, 0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+  backdrop-filter: blur(4px);
+}
+
+.panel h2,
+.panel h3 {
+  margin: 0 0 8px;
+  color: var(--accent);
+  letter-spacing: 0.4px;
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: 88px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 0.95rem;
+}
+
+.bar-wrap {
+  width: 100%;
+  height: 14px;
+  border: 1px solid rgba(233, 248, 255, 0.25);
+  border-radius: 30px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  width: 100%;
+  transition: width 180ms linear, background-color 180ms linear;
+}
+
+.bar.life {
+  background: linear-gradient(90deg, #57df69, #9efe88);
+}
+
+.bar.weapon {
+  background: linear-gradient(90deg, #4ab5ff, #81f2ff);
+}
+
+.instructions ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.life-dot,
+.weapon-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.life-dot {
+  background: #8dff87;
+  box-shadow: 0 0 8px #8dff87;
+}
+
+.weapon-dot {
+  background: #60ddff;
+  box-shadow: 0 0 8px #60ddff;
+}
+
+.score #scoreText {
+  font-size: clamp(2rem, 6vw, 3.2rem);
+  margin: 4px 0;
+  font-weight: 700;
+  text-align: right;
+}
+
+.score .sub {
+  margin: 0;
+  font-size: 0.9rem;
+  text-align: right;
+  opacity: 0.9;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 18, 0.62);
+  display: grid;
+  place-items: center;
+  z-index: 20;
+}
+
+.hidden {
+  display: none;
+}
+
+.overlay-card {
+  width: min(420px, 90vw);
+  background: rgba(8, 15, 35, 0.85);
+  border: 1px solid rgba(165, 200, 255, 0.42);
+  border-radius: 16px;
+  padding: 26px;
+  text-align: center;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.4), 0 0 25px rgba(94, 155, 255, 0.28);
+}
+
+button {
+  margin-top: 12px;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  background: linear-gradient(90deg, #5e95ff, #65f0ff);
+  color: #08142a;
+}
+
+@media (max-width: 900px) {
+  .hud.left {
+    width: min(420px, calc(100vw - 32px));
+  }
+
+  .hud.right {
+    top: auto;
+    bottom: 12px;
+    right: 12px;
+    width: min(220px, 55vw);
+  }
+}
