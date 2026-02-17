@@ -46,7 +46,7 @@ const scoring = {
 };
 
 const keys = {};
-let mouse = { x: 0, y: 0, down: false };
+let mouse = { x: 0, y: 0, down: false, hasMoved: false, lastMoveAt: 0 };
 
 let gameState;
 let stars = [];
@@ -58,6 +58,9 @@ let blackHoles = [];
 let whiteHoles = [];
 let exoplanets = [];
 let centaurKuiperObjects = [];
+let neutronStars = [];
+let saturnPlanets = [];
+let supernovaRemnants = [];
 let supernovas = [];
 let debrisFields = [];
 let abandonedStations = [];
@@ -106,7 +109,19 @@ let audioState = {
   sirenGain: null,
 };
 
+function resetSceneVisuals() {
+  stars = Array.from({ length: 280 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    z: 0.25 + Math.random() * 0.95,
+    twinkle: Math.random() * Math.PI * 2,
+  }));
+  initAmbientSpace();
+}
+
 function resetGame() {
+  particles = [];
+  sparks = [];
   supernovas = [];
   debrisFields = [];
   abandonedStations = [];
@@ -122,6 +137,15 @@ function resetGame() {
   shieldOrbs = [];
   kuiperFragments = [];
   cameraShake = 0;
+  keys.KeyW = keys.KeyA = keys.KeyS = keys.KeyD = false;
+  keys.ArrowUp = keys.ArrowDown = keys.ArrowLeft = keys.ArrowRight = false;
+  keys.Space = false;
+  mouse.down = false;
+  mouse.hasMoved = false;
+  mouse.lastMoveAt = performance.now();
+  mouse.x = canvas.width * 0.5;
+  mouse.y = canvas.height * 0.5;
+  resetSceneVisuals();
   instructionsOpen = false;
   if (instructionsOverlay) instructionsOverlay.classList.add("hidden");
   gameState = {
@@ -180,6 +204,7 @@ function resetGame() {
     ammoBoostTimer: 0,
     ammoBoostTick: 0,
     eclipsePenalty: 0,
+    neutronInterference: 0,
     paused: false,
   };
 
@@ -620,7 +645,10 @@ function updateAudio() {
   );
 
   const staticLevel =
-    (0.0028 + Math.random() * 0.002 + gameState.visibilityPenalty * 0.013) *
+    (0.0028 +
+      Math.random() * 0.002 +
+      gameState.visibilityPenalty * 0.013 +
+      gameState.neutronInterference * 0.012) *
     audioMix.static;
   audioState.staticGain.gain.setTargetAtTime(staticLevel, now, 0.15);
 
@@ -717,7 +745,7 @@ function resize() {
 }
 
 function initAmbientSpace() {
-  nebulae = Array.from({ length: 5 }, createNebula);
+  nebulae = Array.from({ length: 3 }, createNebula);
   starClusters = Array.from({ length: 9 }, createStarCluster);
   blackHoles = Array.from(
     { length: 1 + Math.floor(Math.random() * 2) },
@@ -728,13 +756,22 @@ function initAmbientSpace() {
     createWhiteHole,
   );
   exoplanets = Array.from(
-    { length: 3 + Math.floor(Math.random() * 2) },
+    { length: 1 + Math.floor(Math.random() * 2) },
     createExoplanet,
   );
   centaurKuiperObjects = Array.from(
     { length: 8 + Math.floor(Math.random() * 6) },
     createCentaurKuiperObject,
   );
+  neutronStars = Array.from(
+    { length: 1 + Math.floor(Math.random() * 2) },
+    createNeutronStar,
+  );
+  saturnPlanets = Array.from(
+    { length: 1 + Math.floor(Math.random() * 2) },
+    createSaturnPlanet,
+  );
+  supernovaRemnants = Array.from({ length: 1 }, createSupernovaRemnant);
 }
 
 function createNebula() {
@@ -746,6 +783,10 @@ function createNebula() {
     hue: 180 + Math.random() * 130,
     alpha: 0.08 + Math.random() * 0.11,
     depth: 0.2 + Math.random() * 0.5,
+    driftSpeed: 7 + Math.random() * 12,
+    speedVar: 2 + Math.random() * 5,
+    speedPhase: Math.random() * Math.PI * 2,
+    verticalDrift: (Math.random() - 0.5) * 5,
   };
 }
 
@@ -770,6 +811,10 @@ function createStarCluster() {
     stars,
     depth: 0.35 + Math.random() * 0.55,
     twinkle: Math.random() * Math.PI * 2,
+    driftSpeed: 14 + Math.random() * 16,
+    speedVar: 3 + Math.random() * 6,
+    speedPhase: Math.random() * Math.PI * 2,
+    verticalDrift: (Math.random() - 0.5) * 7,
   };
 }
 
@@ -787,6 +832,10 @@ function createBlackHole() {
     spin: Math.random() * Math.PI * 2,
     ringTilt: 0.55 + Math.random() * 0.25,
     lensRadius: diskRadius * (1.2 + Math.random() * 0.35),
+    driftSpeed: 4 + Math.random() * 8,
+    speedVar: 1.5 + Math.random() * 4,
+    speedPhase: Math.random() * Math.PI * 2,
+    verticalDrift: (Math.random() - 0.5) * 5,
   };
 }
 
@@ -807,6 +856,10 @@ function createWhiteHole() {
     slingshotArmed: false,
     minApproach: Infinity,
     cooldown: 0,
+    driftSpeed: 3 + Math.random() * 7,
+    speedVar: 1.2 + Math.random() * 3.2,
+    speedPhase: Math.random() * Math.PI * 2,
+    verticalDrift: (Math.random() - 0.5) * 5,
   };
 }
 
@@ -821,6 +874,10 @@ function createExoplanet() {
     band: Math.random() * Math.PI * 2,
     ringed: Math.random() > 0.55,
     ringTilt: 0.45 + Math.random() * 0.32,
+    driftSpeed: 1.8 + Math.random() * 4.2,
+    speedVar: 0.8 + Math.random() * 2.8,
+    speedPhase: Math.random() * Math.PI * 2,
+    verticalDrift: (Math.random() - 0.5) * 3.8,
   };
 }
 
@@ -835,6 +892,64 @@ function createCentaurKuiperObject() {
     spinSpeed: (Math.random() - 0.5) * (0.2 + Math.random() * 0.45),
     drift: (Math.random() - 0.5) * 24,
     hue: 185 + Math.random() * 45,
+    driftSpeed: 14 + Math.random() * 20,
+    speedVar: 3 + Math.random() * 8,
+    speedPhase: Math.random() * Math.PI * 2,
+    verticalDrift: (Math.random() - 0.5) * 8,
+  };
+}
+
+function createNeutronStar() {
+  const radius = 14 + Math.random() * 10;
+  return {
+    x: Math.random() * canvas.width,
+    y: canvas.height * (0.12 + Math.random() * 0.76),
+    radius,
+    halo: radius * (2.6 + Math.random() * 1.2),
+    depth: 0.22 + Math.random() * 0.28,
+    spin: Math.random() * Math.PI * 2,
+    pulse: Math.random() * Math.PI * 2,
+    jetTilt: Math.random() * Math.PI * 2,
+    driftSpeed: 5 + Math.random() * 9,
+    speedVar: 1.5 + Math.random() * 4.5,
+    speedPhase: Math.random() * Math.PI * 2,
+    verticalDrift: (Math.random() - 0.5) * 5,
+  };
+}
+
+function createSaturnPlanet() {
+  const radius = 58 + Math.random() * 42;
+  return {
+    x: Math.random() * canvas.width,
+    y: canvas.height * (0.18 + Math.random() * 0.66),
+    radius,
+    ringOuter: radius * (1.85 + Math.random() * 0.24),
+    ringInner: radius * (1.25 + Math.random() * 0.18),
+    ringTilt: 0.34 + Math.random() * 0.16,
+    hue: 30 + Math.random() * 20,
+    depth: 0.16 + Math.random() * 0.25,
+    spin: Math.random() * Math.PI * 2,
+    driftSpeed: 1.4 + Math.random() * 3.6,
+    speedVar: 0.7 + Math.random() * 2.2,
+    speedPhase: Math.random() * Math.PI * 2,
+    verticalDrift: (Math.random() - 0.5) * 3.2,
+  };
+}
+
+function createSupernovaRemnant() {
+  const radius = 46 + Math.random() * 58;
+  return {
+    x: Math.random() * canvas.width,
+    y: canvas.height * (0.12 + Math.random() * 0.74),
+    radius,
+    shock: radius * (1.7 + Math.random() * 0.5),
+    depth: 0.15 + Math.random() * 0.22,
+    pulse: Math.random() * Math.PI * 2,
+    hue: Math.random() > 0.5 ? 22 : 198,
+    driftSpeed: 1 + Math.random() * 2.2,
+    speedVar: 0.4 + Math.random() * 1.2,
+    speedPhase: Math.random() * Math.PI * 2,
+    verticalDrift: (Math.random() - 0.5) * 2.8,
   };
 }
 
@@ -1131,6 +1246,19 @@ function spawnAsteroid(options = {}) {
         radius + Math.random() * (canvas.height - radius * 2),
       ),
     );
+  const mineralSpots = Array.from(
+    { length: 5 + Math.floor(Math.random() * 5) },
+    () => {
+      const ang = Math.random() * Math.PI * 2;
+      const dist = radius * (0.08 + Math.random() * 0.62);
+      return {
+        x: Math.cos(ang) * dist,
+        y: Math.sin(ang) * dist,
+        r: radius * (0.05 + Math.random() * 0.15),
+        a: 0.08 + Math.random() * 0.15,
+      };
+    },
+  );
 
   gameState.asteroids.push({
     x: spawnX,
@@ -1156,6 +1284,11 @@ function spawnAsteroid(options = {}) {
     wobbleSpeed: 0.8 + Math.random() * 1.6,
     tiltBase: 0.72 + Math.random() * 0.24,
     tiltAmp: 0.05 + Math.random() * 0.15,
+    surfaceSeed: Math.random() * Math.PI * 2,
+    surfaceRoughness: 0.45 + Math.random() * 0.5,
+    striationFreq: 1.5 + Math.random() * 2.2,
+    striationAmp: radius * (0.04 + Math.random() * 0.06),
+    mineralSpots,
     hitFlash: 0,
     nearMissArmed: false,
     nearMissAwarded: false,
@@ -1729,7 +1862,18 @@ function update(dt, rawDt = dt) {
   ship.x = Math.max(60, Math.min(canvas.width - 60, ship.x));
   ship.y = Math.max(60, Math.min(canvas.height - 60, ship.y));
 
-  ship.angle = Math.atan2(mouse.y - ship.y, mouse.x - ship.x);
+  const nowMs = performance.now();
+  const mouseActive = mouse.down || (mouse.hasMoved && nowMs - mouse.lastMoveAt < 2200);
+  let targetAngle = ship.angle;
+  if (mouseActive) {
+    targetAngle = Math.atan2(mouse.y - ship.y, mouse.x - ship.x);
+  } else if (Math.hypot(ship.vx, ship.vy) > 18) {
+    targetAngle = Math.atan2(ship.vy, ship.vx);
+  }
+  let delta = targetAngle - ship.angle;
+  while (delta > Math.PI) delta -= Math.PI * 2;
+  while (delta < -Math.PI) delta += Math.PI * 2;
+  ship.angle += delta * Math.min(1, dt * 14);
   ship.fireCooldown = Math.max(0, ship.fireCooldown - dt);
   ship.invulnerableFor = Math.max(0, ship.invulnerableFor - dt);
   ship.wormholeCooldown = Math.max(0, ship.wormholeCooldown - dt);
@@ -2251,8 +2395,13 @@ function update(dt, rawDt = dt) {
   ship.y = Math.max(60, Math.min(canvas.height - 60, ship.y));
 
   for (const nebula of nebulae) {
-    nebula.x -=
-      (8 + 12 * nebula.depth) * dt + ship.vx * dt * 0.018 * nebula.depth;
+    const speed =
+      nebula.driftSpeed +
+      Math.sin(gameState.elapsed * 0.34 + nebula.speedPhase) * nebula.speedVar +
+      12 * nebula.depth;
+    nebula.x -= speed * dt + ship.vx * dt * 0.018 * nebula.depth;
+    nebula.y +=
+      nebula.verticalDrift * dt + Math.sin(nebula.speedPhase + gameState.elapsed * 0.18) * 2.4 * dt;
     nebula.y -= ship.vy * dt * 0.012 * nebula.depth;
     if (nebula.x < -nebula.radius - 120) {
       nebula.x = canvas.width + nebula.radius + 80;
@@ -2263,8 +2412,13 @@ function update(dt, rawDt = dt) {
   }
 
   for (const cluster of starClusters) {
-    cluster.x -=
-      (18 + 20 * cluster.depth) * dt + ship.vx * dt * 0.03 * cluster.depth;
+    const speed =
+      cluster.driftSpeed +
+      Math.sin(gameState.elapsed * 0.42 + cluster.speedPhase) * cluster.speedVar +
+      20 * cluster.depth;
+    cluster.x -= speed * dt + ship.vx * dt * 0.03 * cluster.depth;
+    cluster.y +=
+      cluster.verticalDrift * dt + Math.sin(cluster.speedPhase + gameState.elapsed * 0.2) * 2.8 * dt;
     cluster.y -= ship.vy * dt * 0.016 * cluster.depth;
     cluster.twinkle += dt * (0.8 + cluster.depth);
     if (cluster.x < -cluster.radius - 80) {
@@ -2276,8 +2430,12 @@ function update(dt, rawDt = dt) {
   }
 
   for (const hole of blackHoles) {
-    hole.x -= (5 + hole.depth * 8) * dt;
-    hole.y -= ship.vy * dt * 0.008;
+    const speed =
+      hole.driftSpeed +
+      Math.sin(gameState.elapsed * 0.36 + hole.speedPhase) * hole.speedVar +
+      hole.depth * 8;
+    hole.x -= speed * dt;
+    hole.y += hole.verticalDrift * dt - ship.vy * dt * 0.008;
     hole.spin += dt * 0.7;
 
     if (gameState.advancedUnlocked) {
@@ -2310,8 +2468,12 @@ function update(dt, rawDt = dt) {
   }
 
   for (const hole of whiteHoles) {
-    hole.x -= (4 + hole.depth * 7) * dt;
-    hole.y -= ship.vy * dt * 0.007;
+    const speed =
+      hole.driftSpeed +
+      Math.sin(gameState.elapsed * 0.38 + hole.speedPhase) * hole.speedVar +
+      hole.depth * 7;
+    hole.x -= speed * dt;
+    hole.y += hole.verticalDrift * dt - ship.vy * dt * 0.007;
     hole.spin += dt * 0.55;
     hole.jetPhase += dt * 1.8;
     hole.cooldown = Math.max(0, hole.cooldown - dt);
@@ -2375,8 +2537,13 @@ function update(dt, rawDt = dt) {
   const sy = ship.y - starLight.y;
   const segLenSq = sx * sx + sy * sy;
   for (const exoplanet of exoplanets) {
-    exoplanet.x -=
-      (2 + 5 * exoplanet.depth) * dt + ship.vx * dt * 0.008 * exoplanet.depth;
+    const speed =
+      exoplanet.driftSpeed +
+      Math.sin(gameState.elapsed * 0.28 + exoplanet.speedPhase) * exoplanet.speedVar +
+      5 * exoplanet.depth;
+    exoplanet.x -= speed * dt + ship.vx * dt * 0.008 * exoplanet.depth;
+    exoplanet.y +=
+      exoplanet.verticalDrift * dt + Math.sin(exoplanet.speedPhase + gameState.elapsed * 0.13) * 1.6 * dt;
     exoplanet.y -= ship.vy * dt * 0.005 * exoplanet.depth;
     exoplanet.band += dt * (0.2 + exoplanet.depth * 0.35);
 
@@ -2409,8 +2576,16 @@ function update(dt, rawDt = dt) {
     (eclipseTarget - gameState.eclipsePenalty) * Math.min(1, dt * 2.6);
 
   for (const obj of centaurKuiperObjects) {
-    obj.x -= (16 + 24 * obj.depth) * dt + ship.vx * dt * 0.014 * obj.depth;
-    obj.y += obj.drift * dt * 0.04 - ship.vy * dt * 0.01 * obj.depth;
+    const speed =
+      obj.driftSpeed +
+      Math.sin(gameState.elapsed * 0.55 + obj.speedPhase) * obj.speedVar +
+      24 * obj.depth;
+    obj.x -= speed * dt + ship.vx * dt * 0.014 * obj.depth;
+    obj.y +=
+      obj.verticalDrift * dt +
+      obj.drift * dt * 0.04 +
+      Math.sin(obj.speedPhase + gameState.elapsed * 0.31) * 3.2 * dt;
+    obj.y -= ship.vy * dt * 0.01 * obj.depth;
     obj.spin += obj.spinSpeed * dt;
     if (obj.x < -obj.radius - 40) {
       obj.x = canvas.width + obj.radius + 30;
@@ -2418,6 +2593,83 @@ function update(dt, rawDt = dt) {
     }
     if (obj.y < -obj.radius) obj.y = canvas.height + obj.radius;
     if (obj.y > canvas.height + obj.radius) obj.y = -obj.radius;
+  }
+
+  let neutronInterferenceTarget = 0;
+  for (const star of neutronStars) {
+    const speed =
+      star.driftSpeed +
+      Math.sin(gameState.elapsed * 0.46 + star.speedPhase) * star.speedVar +
+      8 * star.depth;
+    star.x -= speed * dt + ship.vx * dt * 0.01 * star.depth;
+    star.y +=
+      star.verticalDrift * dt + Math.sin(star.speedPhase + gameState.elapsed * 0.2) * 2.1 * dt;
+    star.y -= ship.vy * dt * 0.006 * star.depth;
+    star.spin += dt * 1.2;
+    star.pulse += dt * (1.7 + star.depth);
+
+    const dx = star.x - ship.x;
+    const dy = star.y - ship.y;
+    const dist = Math.hypot(dx, dy);
+    const influenceR = star.halo * 2.1;
+    if (dist < influenceR) {
+      const influence = Math.pow(Math.max(0, 1 - dist / influenceR), 1.6);
+      neutronInterferenceTarget = Math.max(neutronInterferenceTarget, influence);
+    }
+
+    if (star.x < -star.halo - 120) {
+      star.x = canvas.width + star.halo + 90;
+      star.y = canvas.height * (0.12 + Math.random() * 0.76);
+    }
+    if (star.y < -star.halo) star.y = canvas.height + star.halo;
+    if (star.y > canvas.height + star.halo) star.y = -star.halo;
+  }
+  gameState.neutronInterference +=
+    (neutronInterferenceTarget - gameState.neutronInterference) *
+    Math.min(1, dt * 3);
+  if (gameState.neutronInterference > 0.001) {
+    const shakeAcc = 420 * gameState.neutronInterference;
+    ship.vx += (Math.random() - 0.5) * shakeAcc * dt;
+    ship.vy += (Math.random() - 0.5) * shakeAcc * dt;
+  } else {
+    gameState.neutronInterference = 0;
+  }
+
+  for (const planet of saturnPlanets) {
+    const speed =
+      planet.driftSpeed +
+      Math.sin(gameState.elapsed * 0.23 + planet.speedPhase) * planet.speedVar +
+      3.5 * planet.depth;
+    planet.x -= speed * dt + ship.vx * dt * 0.006 * planet.depth;
+    planet.y +=
+      planet.verticalDrift * dt + Math.sin(planet.speedPhase + gameState.elapsed * 0.11) * 1.2 * dt;
+    planet.y -= ship.vy * dt * 0.004 * planet.depth;
+    planet.spin += dt * (0.08 + planet.depth * 0.12);
+    if (planet.x < -planet.ringOuter - 260) {
+      planet.x = canvas.width + planet.ringOuter + 180;
+      planet.y = canvas.height * (0.18 + Math.random() * 0.66);
+    }
+    if (planet.y < -planet.ringOuter) planet.y = canvas.height + planet.ringOuter;
+    if (planet.y > canvas.height + planet.ringOuter) planet.y = -planet.ringOuter;
+  }
+
+  for (const remnant of supernovaRemnants) {
+    const speed =
+      remnant.driftSpeed +
+      Math.sin(gameState.elapsed * 0.18 + remnant.speedPhase) * remnant.speedVar +
+      2.2 * remnant.depth;
+    remnant.x -= speed * dt + ship.vx * dt * 0.004 * remnant.depth;
+    remnant.y +=
+      remnant.verticalDrift * dt + Math.sin(remnant.speedPhase + gameState.elapsed * 0.08) * 1.1 * dt;
+    remnant.y -= ship.vy * dt * 0.003 * remnant.depth;
+    remnant.pulse += dt * (0.35 + remnant.depth * 0.35);
+    if (remnant.x < -remnant.shock - 340) {
+      remnant.x = canvas.width + remnant.shock + 240;
+      remnant.y = canvas.height * (0.12 + Math.random() * 0.74);
+      remnant.hue = Math.random() > 0.5 ? 22 : 198;
+    }
+    if (remnant.y < -remnant.shock) remnant.y = canvas.height + remnant.shock;
+    if (remnant.y > canvas.height + remnant.shock) remnant.y = -remnant.shock;
   }
 
   for (const star of stars) {
@@ -2539,6 +2791,176 @@ function drawStars() {
     ctx.fillStyle = cloud;
     ctx.beginPath();
     ctx.arc(nebula.x, nebula.y, nebula.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  for (const remnant of supernovaRemnants) {
+    const pulse = 0.62 + 0.38 * (0.5 + 0.5 * Math.sin(remnant.pulse));
+    const haze = ctx.createRadialGradient(
+      remnant.x,
+      remnant.y,
+      remnant.radius * 0.2,
+      remnant.x,
+      remnant.y,
+      remnant.shock,
+    );
+    haze.addColorStop(
+      0,
+      `hsla(${remnant.hue}, 85%, 68%, ${0.2 + pulse * 0.12})`,
+    );
+    haze.addColorStop(
+      0.55,
+      `hsla(${(remnant.hue + 28) % 360}, 85%, 56%, ${0.13 + pulse * 0.08})`,
+    );
+    haze.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = haze;
+    ctx.beginPath();
+    ctx.arc(remnant.x, remnant.y, remnant.shock, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `hsla(${remnant.hue}, 95%, 72%, ${0.2 + pulse * 0.16})`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(
+      remnant.x,
+      remnant.y,
+      remnant.radius * (1.05 + pulse * 0.18),
+      0,
+      Math.PI * 2,
+    );
+    ctx.stroke();
+  }
+
+  for (const planet of saturnPlanets) {
+    ctx.save();
+    ctx.translate(planet.x, planet.y);
+    ctx.rotate(planet.spin * 0.45);
+
+    const ringBack = ctx.createLinearGradient(
+      -planet.ringOuter,
+      0,
+      planet.ringOuter,
+      0,
+    );
+    ringBack.addColorStop(0, "rgba(216,198,156,0.12)");
+    ringBack.addColorStop(0.5, "rgba(252,230,184,0.3)");
+    ringBack.addColorStop(1, "rgba(196,180,146,0.12)");
+    ctx.strokeStyle = ringBack;
+    ctx.lineWidth = Math.max(2.2, planet.radius * 0.11);
+    ctx.beginPath();
+    ctx.ellipse(
+      0,
+      0,
+      planet.ringOuter,
+      planet.ringOuter * planet.ringTilt,
+      0,
+      Math.PI,
+      Math.PI * 2,
+    );
+    ctx.stroke();
+
+    const body = ctx.createRadialGradient(
+      -planet.radius * 0.3,
+      -planet.radius * 0.28,
+      planet.radius * 0.12,
+      0,
+      0,
+      planet.radius,
+    );
+    body.addColorStop(0, `hsla(${planet.hue}, 75%, 82%, 0.92)`);
+    body.addColorStop(0.5, `hsla(${planet.hue + 4}, 62%, 63%, 0.88)`);
+    body.addColorStop(1, `hsla(${planet.hue + 7}, 54%, 36%, 0.9)`);
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.arc(0, 0, planet.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (let b = 0; b < 4; b++) {
+      ctx.strokeStyle = `rgba(255,236,204,${0.1 + b * 0.04})`;
+      ctx.lineWidth = 1 + b * 0.6;
+      ctx.beginPath();
+      ctx.ellipse(
+        0,
+        (b - 1.5) * planet.radius * 0.14,
+        planet.radius * (0.72 + b * 0.08),
+        planet.radius * (0.08 + b * 0.02),
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.stroke();
+    }
+
+    const ringFront = ctx.createLinearGradient(
+      -planet.ringOuter,
+      0,
+      planet.ringOuter,
+      0,
+    );
+    ringFront.addColorStop(0, "rgba(205,188,150,0.18)");
+    ringFront.addColorStop(0.5, "rgba(255,236,194,0.52)");
+    ringFront.addColorStop(1, "rgba(205,188,150,0.18)");
+    ctx.strokeStyle = ringFront;
+    ctx.lineWidth = Math.max(2.6, planet.radius * 0.12);
+    ctx.beginPath();
+    ctx.ellipse(
+      0,
+      0,
+      planet.ringOuter,
+      planet.ringOuter * planet.ringTilt,
+      0,
+      0,
+      Math.PI,
+    );
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  for (const star of neutronStars) {
+    const pulse = 0.58 + 0.42 * (0.5 + 0.5 * Math.sin(star.pulse));
+    const corona = ctx.createRadialGradient(
+      star.x,
+      star.y,
+      star.radius * 0.2,
+      star.x,
+      star.y,
+      star.halo,
+    );
+    corona.addColorStop(0, `rgba(240,250,255,${0.95})`);
+    corona.addColorStop(0.2, `rgba(180,225,255,${0.5 + pulse * 0.25})`);
+    corona.addColorStop(0.6, `rgba(120,180,255,${0.2 + pulse * 0.12})`);
+    corona.addColorStop(1, "rgba(120,180,255,0)");
+    ctx.fillStyle = corona;
+    ctx.beginPath();
+    ctx.arc(star.x, star.y, star.halo, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(star.x, star.y);
+    ctx.rotate(star.jetTilt + star.spin);
+    ctx.strokeStyle = `rgba(188,228,255,${0.22 + pulse * 0.2})`;
+    ctx.lineWidth = 2.1;
+    ctx.beginPath();
+    ctx.moveTo(-star.halo * 0.9, 0);
+    ctx.lineTo(star.halo * 0.9, 0);
+    ctx.moveTo(0, -star.halo * 0.72);
+    ctx.lineTo(0, star.halo * 0.72);
+    ctx.stroke();
+    ctx.restore();
+
+    const core = ctx.createRadialGradient(
+      star.x - star.radius * 0.15,
+      star.y - star.radius * 0.15,
+      1,
+      star.x,
+      star.y,
+      star.radius,
+    );
+    core.addColorStop(0, "rgba(255,255,255,1)");
+    core.addColorStop(1, "rgba(196,232,255,0.96)");
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -3112,6 +3534,25 @@ function drawScreenEffects() {
     ctx.fill();
     ctx.restore();
   }
+
+  if (gameState.neutronInterference > 0.02) {
+    const n = gameState.neutronInterference;
+    ctx.fillStyle = `rgba(190,220,255,${0.035 + n * 0.08})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const lines = 4 + Math.floor(n * 7);
+    ctx.strokeStyle = `rgba(210,232,255,${0.05 + n * 0.12})`;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < lines; i++) {
+      const y = Math.random() * canvas.height;
+      const len = canvas.width * (0.25 + Math.random() * 0.65);
+      const x = (Math.random() * (canvas.width - len));
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + len, y + (Math.random() - 0.5) * 1.2);
+      ctx.stroke();
+    }
+  }
 }
 
 function drawCockpitOverlay() {
@@ -3199,15 +3640,22 @@ function drawShip() {
   ctx.fill();
 
   ctx.beginPath();
-  ctx.moveTo(28, 0);
-  ctx.lineTo(-20, -14);
-  ctx.lineTo(-8, 0);
-  ctx.lineTo(-20, 14);
+  ctx.moveTo(32, 0);
+  ctx.lineTo(20, -7);
+  ctx.lineTo(1, -12);
+  ctx.lineTo(-16, -15);
+  ctx.lineTo(-28, -8);
+  ctx.lineTo(-18, -2);
+  ctx.lineTo(-18, 2);
+  ctx.lineTo(-28, 8);
+  ctx.lineTo(-16, 15);
+  ctx.lineTo(1, 12);
+  ctx.lineTo(20, 7);
   ctx.closePath();
   const hull = ctx.createLinearGradient(
-    -20 - lx * 9,
+    -24 - lx * 12,
     -ly * 9,
-    28 + lx * 9,
+    34 + lx * 12,
     ly * 9,
   );
   if (lifeStage >= 3) {
@@ -3224,12 +3672,12 @@ function drawShip() {
   ctx.fill();
 
   // Persistent glow so the ship remains readable against busy deep-space FX.
-  const hullGlow = ctx.createRadialGradient(2, 0, 2, 2, 0, 42);
+  const hullGlow = ctx.createRadialGradient(4, 0, 2, 4, 0, 46);
   hullGlow.addColorStop(0, "rgba(255,255,245,0.34)");
   hullGlow.addColorStop(1, "rgba(255,255,245,0)");
   ctx.fillStyle = hullGlow;
   ctx.beginPath();
-  ctx.arc(2, 0, 40, 0, Math.PI * 2);
+  ctx.arc(2, 0, 44, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = "rgba(10,14,22,0.86)";
@@ -3240,9 +3688,51 @@ function drawShip() {
   ctx.lineWidth = 1.15;
   ctx.stroke();
 
-  ctx.fillStyle = `rgba(220,245,255,${0.12 + light.intensity * 0.1})`;
+  // Wing root fairings add depth and break the flat silhouette.
+  for (let s = -1; s <= 1; s += 2) {
+    ctx.beginPath();
+    ctx.moveTo(-4, s * 8);
+    ctx.lineTo(-20, s * 16);
+    ctx.lineTo(-10, s * 6);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(230,236,244,0.9)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(8,12,20,0.66)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Engine nacelles.
+  for (let s = -1; s <= 1; s += 2) {
+    ctx.beginPath();
+    ctx.ellipse(-18, s * 6, 7, 3.8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(224,232,242,0.9)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(8,12,20,0.72)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Spine panel and nose plate.
   ctx.beginPath();
-  ctx.arc(4 + lx * 7, ly * 6, 6, 0, Math.PI * 2);
+  ctx.moveTo(23, 0);
+  ctx.lineTo(8, -4);
+  ctx.lineTo(-10, -4);
+  ctx.lineTo(-10, 4);
+  ctx.lineTo(8, 4);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(225,233,242,0.82)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(40,52,70,0.6)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(32, 0);
+  ctx.lineTo(24, -3.5);
+  ctx.lineTo(24, 3.5);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(210,220,232,0.95)";
   ctx.fill();
 
   if (lifeStage <= 2) {
@@ -3258,33 +3748,47 @@ function drawShip() {
   }
 
   ctx.beginPath();
-  ctx.arc(-4, 0, 6, 0, Math.PI * 2);
-  ctx.fillStyle = "#1f3665";
+  ctx.ellipse(-1, 0, 7.6, 5.4, 0, 0, Math.PI * 2);
+  ctx.fillStyle = "#294a84";
   ctx.fill();
+  ctx.strokeStyle = "rgba(174,218,255,0.7)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-6, -0.8);
+  ctx.lineTo(3, -2.2);
+  ctx.strokeStyle = "rgba(222,246,255,0.56)";
+  ctx.stroke();
 
   // Wing flaps tilt with left/right steering for more lifelike movement.
   ctx.save();
   ctx.translate(-19, -8);
   ctx.rotate(-flapTilt);
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(-16, -9);
-  ctx.lineTo(0, 3);
+  ctx.moveTo(0, -1);
+  ctx.lineTo(-17, -9.5);
+  ctx.lineTo(-4, 2.5);
   ctx.closePath();
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "rgba(246,250,255,0.98)";
   ctx.fill();
+  ctx.strokeStyle = "rgba(18,24,34,0.78)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
   ctx.restore();
 
   ctx.save();
   ctx.translate(-19, 8);
   ctx.rotate(flapTilt);
   ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(-16, 9);
-  ctx.lineTo(0, -3);
+  ctx.moveTo(0, 1);
+  ctx.lineTo(-17, 9.5);
+  ctx.lineTo(-4, -2.5);
   ctx.closePath();
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "rgba(246,250,255,0.98)";
   ctx.fill();
+  ctx.strokeStyle = "rgba(18,24,34,0.78)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
   ctx.restore();
 
   const engineLen =
@@ -3680,51 +4184,96 @@ function drawEntities() {
       else ctx.lineTo(p.x, p.y);
     }
     ctx.closePath();
+    const ldx = light.x - asteroid.x;
+    const ldy = light.y - asteroid.y;
+    const llen = Math.max(1, Math.hypot(ldx, ldy));
+    const lx = ldx / llen;
+    const ly = ldy / llen;
 
     const typeStyle = {
       normal: {
-        a: "#b7a38d",
-        b: "#8e7462",
-        c: "#4c3c33",
+        a: "#c7b39b",
+        b: "#8e7767",
+        c: "#4a3b32",
         stroke: "rgba(38,27,22,0.55)",
       },
       heavy: {
-        a: "#c8b39d",
-        b: "#8f7562",
-        c: "#44362f",
+        a: "#d2beaa",
+        b: "#8e7667",
+        c: "#3f322b",
         stroke: "rgba(58,42,31,0.72)",
       },
       explosive: {
-        a: "#df9376",
-        b: "#9d5f4a",
-        c: "#572f2a",
+        a: "#e5a186",
+        b: "#9d614c",
+        c: "#4f2a26",
         stroke: "rgba(85,36,24,0.78)",
       },
       splitting: {
-        a: "#d9c28a",
-        b: "#9d8755",
-        c: "#5b4b2e",
+        a: "#e1ce9a",
+        b: "#9a8457",
+        c: "#54462d",
         stroke: "rgba(85,64,21,0.72)",
       },
       magnetic: {
-        a: "#8bb0c8",
-        b: "#66839a",
-        c: "#2f4154",
+        a: "#9abfd8",
+        b: "#65849d",
+        c: "#2a3c50",
         stroke: "rgba(56,88,116,0.75)",
       },
     };
     const skin = typeStyle[asteroid.type] || typeStyle.normal;
     const grd = ctx.createLinearGradient(
-      -asteroid.radius,
-      -asteroid.radius,
-      asteroid.radius,
-      asteroid.radius,
+      -lx * asteroid.radius * 1.1,
+      -ly * asteroid.radius * 1.1,
+      lx * asteroid.radius * 1.1,
+      ly * asteroid.radius * 1.1,
     );
     grd.addColorStop(0, skin.a);
-    grd.addColorStop(0.45, skin.b);
+    grd.addColorStop(0.5, skin.b);
     grd.addColorStop(1, skin.c);
     ctx.fillStyle = grd;
     ctx.fill();
+
+    ctx.save();
+    ctx.clip();
+    for (let band = 0; band < 5; band++) {
+      const y0 =
+        -asteroid.radius * 0.72 +
+        (band / 4) * asteroid.radius * 1.44 +
+        Math.sin(asteroid.surfaceSeed + band * 1.7) * asteroid.striationAmp;
+      ctx.strokeStyle = `rgba(54,44,38,${0.07 + asteroid.surfaceRoughness * 0.1})`;
+      ctx.lineWidth = Math.max(0.8, asteroid.radius * 0.018);
+      ctx.beginPath();
+      ctx.moveTo(-asteroid.radius * 0.9, y0);
+      ctx.lineTo(
+        asteroid.radius * 0.9,
+        y0 +
+          Math.sin(
+            asteroid.surfaceSeed * 1.4 + band * asteroid.striationFreq,
+          ) *
+            asteroid.striationAmp *
+            0.7,
+      );
+      ctx.stroke();
+    }
+    for (const spot of asteroid.mineralSpots || []) {
+      ctx.beginPath();
+      ctx.arc(spot.x, spot.y, spot.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(34,27,22,${spot.a})`;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(
+        spot.x - spot.r * 0.24,
+        spot.y - spot.r * 0.24,
+        spot.r * 0.42,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fillStyle = `rgba(240,215,180,${spot.a * 0.34})`;
+      ctx.fill();
+    }
+    ctx.restore();
 
     ctx.lineWidth = Math.max(1.5, asteroid.radius * 0.06);
     ctx.strokeStyle = skin.stroke;
@@ -3743,11 +4292,6 @@ function drawEntities() {
     ctx.fillStyle = rim;
     ctx.fill();
 
-    const ldx = light.x - asteroid.x;
-    const ldy = light.y - asteroid.y;
-    const llen = Math.max(1, Math.hypot(ldx, ldy));
-    const lx = ldx / llen;
-    const ly = ldy / llen;
     const spec = ctx.createRadialGradient(
       lx * asteroid.radius * 0.42,
       ly * asteroid.radius * 0.35,
@@ -3777,8 +4321,12 @@ function drawEntities() {
     for (const crater of craters) {
       ctx.beginPath();
       ctx.arc(crater.x, crater.y, crater.r, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(44,31,26,0.3)";
+      ctx.fillStyle = "rgba(30,22,18,0.42)";
       ctx.fill();
+
+      ctx.strokeStyle = "rgba(17,12,9,0.26)";
+      ctx.lineWidth = Math.max(0.8, crater.r * 0.18);
+      ctx.stroke();
 
       ctx.beginPath();
       ctx.arc(
@@ -3788,8 +4336,20 @@ function drawEntities() {
         0,
         Math.PI * 2,
       );
-      ctx.fillStyle = "rgba(255,232,198,0.08)";
+      ctx.fillStyle = "rgba(255,238,210,0.14)";
       ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(
+        crater.x + crater.r * 0.22,
+        crater.y + crater.r * 0.18,
+        crater.r * 0.76,
+        Math.PI * 1.02,
+        Math.PI * 1.66,
+      );
+      ctx.strokeStyle = "rgba(28,20,16,0.22)";
+      ctx.lineWidth = Math.max(0.7, crater.r * 0.14);
+      ctx.stroke();
     }
 
     if (asteroid.type === "heavy") {
@@ -3924,6 +4484,8 @@ window.addEventListener("resize", resize);
 window.addEventListener("mousemove", (e) => {
   mouse.x = e.clientX;
   mouse.y = e.clientY;
+  mouse.hasMoved = true;
+  mouse.lastMoveAt = performance.now();
 });
 window.addEventListener("mousedown", () => {
   mouse.down = true;
