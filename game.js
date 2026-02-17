@@ -1636,9 +1636,7 @@ function shoot() {
   )
     return;
 
-  const angle = touchInput.active
-    ? ship.angle
-    : Math.atan2(mouse.y - ship.y, mouse.x - ship.x);
+  const angle = ship.angle;
   gameState.bullets.push({
     x: ship.x + Math.cos(angle) * 30,
     y: ship.y + Math.sin(angle) * 30,
@@ -1945,7 +1943,9 @@ function update(dt, rawDt = dt) {
     (mouse.down || (mouse.hasMoved && nowMs - mouse.lastMoveAt < 2200)) &&
     !touchInput.active;
   let targetAngle = ship.angle;
-  if (mouseActive) {
+  if (touchInput.active && Math.hypot(axisX, axisY) > 0.08) {
+    targetAngle = Math.atan2(axisY, axisX);
+  } else if (mouseActive) {
     targetAngle = Math.atan2(mouse.y - ship.y, mouse.x - ship.x);
   } else if (Math.hypot(ship.vx, ship.vy) > 18) {
     targetAngle = Math.atan2(ship.vy, ship.vx);
