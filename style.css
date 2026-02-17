@@ -156,6 +156,22 @@ body {
   opacity: 0.9;
 }
 
+.hud-controls {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.hud-controls button {
+  margin-top: 0;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  min-width: 74px;
+}
+
 .overlay {
   position: fixed;
   inset: 0;
