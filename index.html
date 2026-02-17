@@ -51,10 +51,22 @@
         </div>
         <details id="startInstructions" class="start-instructions">
           <summary>How to Play</summary>
-          <ul>
+          <ul data-instructions="desktop">
             <li>Move with <strong>WASD</strong> or <strong>Arrow Keys</strong>.</li>
             <li>Aim with mouse, shoot with <strong>Space</strong> or left-click.</li>
             <li><strong>Shift</strong> to boost, <strong>P</strong> to pause/resume, <strong>M</strong> to mute.</li>
+            <li>Pass through <span class="life-dot"></span> ion clouds to heal + refill ammo.</li>
+            <li>Collect purple shield orbs for a <strong>10s shield</strong> (blocks one asteroid hit).</li>
+            <li>Shoot Centaur/Kuiper objects to spawn fragments; collect them for <strong>ammo boost</strong>.</li>
+            <li>Wormholes teleport you and grant score bonus.</li>
+            <li>Scoring: asteroid <strong>+2</strong> (combo multiplier at 3+ quick kills), near miss <strong>+3</strong>, comet <strong>+10</strong>, wormhole <strong>+25</strong>, white-hole slingshot <strong>+12</strong>, survive each minute <strong>+30</strong>.</li>
+            <li>At 0 life or 3 consecutive hits, mission fails.</li>
+          </ul>
+          <ul data-instructions="mobile" class="hidden">
+            <li>Rotate phone to <strong>landscape</strong> to play.</li>
+            <li>Drag anywhere to move the ship (left/right/up/down).</li>
+            <li>Tap anywhere to fire.</li>
+            <li>Use on-screen <strong>Pause</strong>, <strong>Mute</strong>, and <strong>Instructions</strong> buttons.</li>
             <li>Pass through <span class="life-dot"></span> ion clouds to heal + refill ammo.</li>
             <li>Collect purple shield orbs for a <strong>10s shield</strong> (blocks one asteroid hit).</li>
             <li>Shoot Centaur/Kuiper objects to spawn fragments; collect them for <strong>ammo boost</strong>.</li>
@@ -78,7 +90,7 @@
     <div id="instructionsOverlay" class="overlay hidden">
       <div class="overlay-card instructions-card">
         <h1>Instructions</h1>
-        <ul>
+        <ul data-instructions="desktop">
           <li>Move with <strong>WASD</strong> or <strong>Arrow Keys</strong>.</li>
           <li>Aim with mouse, shoot with <strong>Space</strong> or left-click.</li>
           <li><strong>Shift</strong> to boost, <strong>P</strong> to pause/resume, <strong>M</strong> to mute.</li>
@@ -89,7 +101,26 @@
           <li>Scoring: asteroid <strong>+2</strong> (combo multiplier at 3+ quick kills), near miss <strong>+3</strong>, comet <strong>+10</strong>, wormhole <strong>+25</strong>, white-hole slingshot <strong>+12</strong>, survive each minute <strong>+30</strong>.</li>
           <li>At 0 life or 3 consecutive hits, mission fails.</li>
         </ul>
+        <ul data-instructions="mobile" class="hidden">
+          <li>Rotate phone to <strong>landscape</strong> to play.</li>
+          <li>Drag anywhere to move the ship (left/right/up/down).</li>
+          <li>Tap anywhere to fire.</li>
+          <li>Use on-screen <strong>Pause</strong>, <strong>Mute</strong>, and <strong>Instructions</strong> buttons.</li>
+          <li>Pass through <span class="life-dot"></span> ion clouds to heal + refill ammo.</li>
+          <li>Collect purple shield orbs for a <strong>10s shield</strong> (blocks one asteroid hit).</li>
+          <li>Shoot Centaur/Kuiper objects to spawn fragments; collect them for <strong>ammo boost</strong>.</li>
+          <li>Wormholes teleport you and grant score bonus.</li>
+          <li>Scoring: asteroid <strong>+2</strong> (combo multiplier at 3+ quick kills), near miss <strong>+3</strong>, comet <strong>+10</strong>, wormhole <strong>+25</strong>, white-hole slingshot <strong>+12</strong>, survive each minute <strong>+30</strong>.</li>
+          <li>At 0 life or 3 consecutive hits, mission fails.</li>
+        </ul>
         <button id="closeInstructionsButton" type="button">Resume Game</button>
+      </div>
+    </div>
+
+    <div id="rotateNotice" class="overlay hidden">
+      <div class="overlay-card">
+        <h1>Rotate Device</h1>
+        <p>Please rotate to landscape mode to play.</p>
       </div>
     </div>
 

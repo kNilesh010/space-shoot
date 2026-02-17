@@ -19,6 +19,7 @@ const instructionsOverlay = document.getElementById("instructionsOverlay");
 const closeInstructionsButton = document.getElementById(
   "closeInstructionsButton",
 );
+const rotateNotice = document.getElementById("rotateNotice");
 const gameHud = document.getElementById("gameHud");
 const startMenu = document.getElementById("startMenu");
 const startGameButton = document.getElementById("startGameButton");
@@ -26,6 +27,7 @@ const readInstructionsButton = document.getElementById(
   "readInstructionsButton",
 );
 const startInstructions = document.getElementById("startInstructions");
+const instructionBlocks = document.querySelectorAll("[data-instructions]");
 
 const config = {
   maxLife: 3,
@@ -78,6 +80,18 @@ let kuiperFragments = [];
 let cameraShake = 0;
 let gameStarted = false;
 let instructionsOpen = false;
+let orientationBlocked = false;
+const touchInput = {
+  active: false,
+  axisX: 0,
+  axisY: 0,
+  pointerId: null,
+  startX: 0,
+  startY: 0,
+  lastX: 0,
+  lastY: 0,
+  startAt: 0,
+};
 const audioMix = {
   master: 0.22,
   engine: 1.0,
@@ -145,9 +159,20 @@ function resetGame() {
   mouse.lastMoveAt = performance.now();
   mouse.x = canvas.width * 0.5;
   mouse.y = canvas.height * 0.5;
+  touchInput.active = false;
+  touchInput.axisX = 0;
+  touchInput.axisY = 0;
+  touchInput.pointerId = null;
+  touchInput.startX = 0;
+  touchInput.startY = 0;
+  touchInput.lastX = 0;
+  touchInput.lastY = 0;
+  touchInput.startAt = 0;
   resetSceneVisuals();
   instructionsOpen = false;
   if (instructionsOverlay) instructionsOverlay.classList.add("hidden");
+  if (rotateNotice) rotateNotice.classList.add("hidden");
+  orientationBlocked = false;
   gameState = {
     score: 0,
     destroyed: 0,
@@ -537,6 +562,7 @@ function togglePause() {
   if (
     !gameStarted ||
     instructionsOpen ||
+    orientationBlocked ||
     !gameState ||
     gameState.over ||
     gameState.gameOverSequence
@@ -556,11 +582,65 @@ function updateControlButtons() {
   }
 }
 
+function isTouchLandscapeMode() {
+  return (
+    window.matchMedia &&
+    window.matchMedia("(pointer: coarse)").matches &&
+    window.innerWidth <= 1100
+  );
+}
+
+function isPortrait() {
+  return window.innerHeight > window.innerWidth;
+}
+
+function isSmartphoneLike() {
+  return (
+    window.matchMedia &&
+    window.matchMedia("(pointer: coarse)").matches &&
+    window.innerWidth <= 1100
+  );
+}
+
+function updateInstructionMode() {
+  const mobile = isSmartphoneLike();
+  for (const block of instructionBlocks) {
+    const mode = block.getAttribute("data-instructions");
+    block.classList.toggle("hidden", mode === "mobile" ? !mobile : mobile);
+  }
+}
+
+function applyLandscapeLock() {
+  const shouldLock = gameStarted && isTouchLandscapeMode() && isPortrait();
+  if (rotateNotice) rotateNotice.classList.toggle("hidden", !shouldLock);
+  if (shouldLock) {
+    orientationBlocked = true;
+    if (gameState && !gameState.over) gameState.paused = true;
+    touchInput.active = false;
+    touchInput.axisX = 0;
+    touchInput.axisY = 0;
+    touchInput.pointerId = null;
+  } else if (orientationBlocked) {
+    orientationBlocked = false;
+    if (
+      gameState &&
+      !gameState.over &&
+      !gameState.gameOverSequence &&
+      !instructionsOpen
+    ) {
+      gameState.paused = false;
+    }
+  }
+  updateControlButtons();
+}
+
 function setGameStarted(started) {
   gameStarted = started;
   if (gameHud) gameHud.classList.toggle("hidden", !started);
   if (startMenu) startMenu.classList.toggle("hidden", started);
   if (gameState && started) gameState.paused = false;
+  updateInstructionMode();
+  applyLandscapeLock();
   updateControlButtons();
 }
 
@@ -585,10 +665,12 @@ function closeInstructionsOverlay() {
     gameStarted &&
     gameState &&
     !gameState.over &&
-    !gameState.gameOverSequence
+    !gameState.gameOverSequence &&
+    !orientationBlocked
   ) {
     gameState.paused = false;
   }
+  applyLandscapeLock();
   updateControlButtons();
 }
 
@@ -1554,7 +1636,9 @@ function shoot() {
   )
     return;
 
-  const angle = Math.atan2(mouse.y - ship.y, mouse.x - ship.x);
+  const angle = touchInput.active
+    ? ship.angle
+    : Math.atan2(mouse.y - ship.y, mouse.x - ship.x);
   gameState.bullets.push({
     x: ship.x + Math.cos(angle) * 30,
     y: ship.y + Math.sin(angle) * 30,
@@ -1791,29 +1875,23 @@ function update(dt, rawDt = dt) {
     gameState.nextSurvivalBonusAt += 60;
   }
 
-  const moving =
-    keys.KeyW ||
-    keys.KeyA ||
-    keys.KeyS ||
-    keys.KeyD ||
-    keys.ArrowUp ||
-    keys.ArrowDown ||
-    keys.ArrowLeft ||
-    keys.ArrowRight;
-  const boosting = (keys.ShiftLeft || keys.ShiftRight) && moving;
-  ship.boosting = boosting;
-
-  const accel = boosting ? 1040 : 780;
-  const drag = Math.exp(-(boosting ? 1.45 : 1.9) * dt);
-  const maxSpeed = boosting ? 610 : 455;
+  const touchAxisX = touchInput.active ? touchInput.axisX : 0;
+  const touchAxisY = touchInput.active ? touchInput.axisY : 0;
 
   const up = keys.KeyW || keys.ArrowUp;
   const down = keys.KeyS || keys.ArrowDown;
   const left = keys.KeyA || keys.ArrowLeft;
   const right = keys.KeyD || keys.ArrowRight;
 
-  const axisX = (right ? 1 : 0) - (left ? 1 : 0);
-  const axisY = (down ? 1 : 0) - (up ? 1 : 0);
+  const axisX = (right ? 1 : 0) - (left ? 1 : 0) + touchAxisX;
+  const axisY = (down ? 1 : 0) - (up ? 1 : 0) + touchAxisY;
+  const moving = Math.hypot(axisX, axisY) > 0.06;
+  const boosting = (keys.ShiftLeft || keys.ShiftRight) && moving;
+  ship.boosting = boosting;
+
+  const accel = boosting ? 1040 : 780;
+  const drag = Math.exp(-(boosting ? 1.45 : 1.9) * dt);
+  const maxSpeed = boosting ? 610 : 455;
   const axisLen = Math.hypot(axisX, axisY) || 1;
   const nx = axisX / axisLen;
   const ny = axisY / axisLen;
@@ -1863,7 +1941,9 @@ function update(dt, rawDt = dt) {
   ship.y = Math.max(60, Math.min(canvas.height - 60, ship.y));
 
   const nowMs = performance.now();
-  const mouseActive = mouse.down || (mouse.hasMoved && nowMs - mouse.lastMoveAt < 2200);
+  const mouseActive =
+    (mouse.down || (mouse.hasMoved && nowMs - mouse.lastMoveAt < 2200)) &&
+    !touchInput.active;
   let targetAngle = ship.angle;
   if (mouseActive) {
     targetAngle = Math.atan2(mouse.y - ship.y, mouse.x - ship.x);
@@ -4480,7 +4560,11 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-window.addEventListener("resize", resize);
+window.addEventListener("resize", () => {
+  resize();
+  updateInstructionMode();
+  applyLandscapeLock();
+});
 window.addEventListener("mousemove", (e) => {
   mouse.x = e.clientX;
   mouse.y = e.clientY;
@@ -4521,6 +4605,7 @@ window.addEventListener("keyup", (e) => {
 });
 canvas.addEventListener("click", () => {
   if (!gameStarted) return;
+  if (isSmartphoneLike()) return;
   ensureAudioStarted();
   shoot();
 });
@@ -4559,7 +4644,66 @@ if (closeInstructionsButton)
     closeInstructionsButton.blur();
   });
 
+canvas.addEventListener("pointerdown", (e) => {
+  if (!isSmartphoneLike() || !gameStarted || orientationBlocked || instructionsOpen)
+    return;
+  ensureAudioStarted();
+  canvas.setPointerCapture(e.pointerId);
+  touchInput.active = true;
+  touchInput.pointerId = e.pointerId;
+  touchInput.startX = e.clientX;
+  touchInput.startY = e.clientY;
+  touchInput.lastX = e.clientX;
+  touchInput.lastY = e.clientY;
+  touchInput.startAt = performance.now();
+  touchInput.axisX = 0;
+  touchInput.axisY = 0;
+});
+
+canvas.addEventListener("pointermove", (e) => {
+  if (!touchInput.active || touchInput.pointerId !== e.pointerId) return;
+  touchInput.lastX = e.clientX;
+  touchInput.lastY = e.clientY;
+  const dx = e.clientX - touchInput.startX;
+  const dy = e.clientY - touchInput.startY;
+  const dead = 8;
+  const scale = 68;
+  touchInput.axisX = Math.max(
+    -1,
+    Math.min(1, Math.abs(dx) < dead ? 0 : dx / scale),
+  );
+  touchInput.axisY = Math.max(
+    -1,
+    Math.min(1, Math.abs(dy) < dead ? 0 : dy / scale),
+  );
+});
+
+const releaseTouchControl = (e) => {
+  if (!touchInput.active || touchInput.pointerId !== e.pointerId) return;
+  const dx = touchInput.lastX - touchInput.startX;
+  const dy = touchInput.lastY - touchInput.startY;
+  const dist = Math.hypot(dx, dy);
+  const duration = performance.now() - touchInput.startAt;
+  if (
+    gameStarted &&
+    !orientationBlocked &&
+    !instructionsOpen &&
+    dist < 18 &&
+    duration < 260
+  ) {
+    shoot();
+  }
+  touchInput.active = false;
+  touchInput.pointerId = null;
+  touchInput.axisX = 0;
+  touchInput.axisY = 0;
+};
+canvas.addEventListener("pointerup", releaseTouchControl);
+canvas.addEventListener("pointercancel", releaseTouchControl);
+canvas.addEventListener("lostpointercapture", releaseTouchControl);
+
 resize();
 resetGame();
+updateInstructionMode();
 setGameStarted(false);
 requestAnimationFrame(loop);
