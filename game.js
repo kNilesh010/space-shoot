@@ -4644,28 +4644,28 @@ if (closeInstructionsButton)
     closeInstructionsButton.blur();
   });
 
-canvas.addEventListener("pointerdown", (e) => {
+function beginTouchControl(clientX, clientY, id = null) {
   if (!isSmartphoneLike() || !gameStarted || orientationBlocked || instructionsOpen)
-    return;
+    return false;
   ensureAudioStarted();
-  canvas.setPointerCapture(e.pointerId);
   touchInput.active = true;
-  touchInput.pointerId = e.pointerId;
-  touchInput.startX = e.clientX;
-  touchInput.startY = e.clientY;
-  touchInput.lastX = e.clientX;
-  touchInput.lastY = e.clientY;
+  touchInput.pointerId = id;
+  touchInput.startX = clientX;
+  touchInput.startY = clientY;
+  touchInput.lastX = clientX;
+  touchInput.lastY = clientY;
   touchInput.startAt = performance.now();
   touchInput.axisX = 0;
   touchInput.axisY = 0;
-});
+  return true;
+}
 
-canvas.addEventListener("pointermove", (e) => {
-  if (!touchInput.active || touchInput.pointerId !== e.pointerId) return;
-  touchInput.lastX = e.clientX;
-  touchInput.lastY = e.clientY;
-  const dx = e.clientX - touchInput.startX;
-  const dy = e.clientY - touchInput.startY;
+function updateTouchControl(clientX, clientY) {
+  if (!touchInput.active) return;
+  touchInput.lastX = clientX;
+  touchInput.lastY = clientY;
+  const dx = clientX - touchInput.startX;
+  const dy = clientY - touchInput.startY;
   const dead = 8;
   const scale = 68;
   touchInput.axisX = Math.max(
@@ -4676,10 +4676,11 @@ canvas.addEventListener("pointermove", (e) => {
     -1,
     Math.min(1, Math.abs(dy) < dead ? 0 : dy / scale),
   );
-});
+}
 
-const releaseTouchControl = (e) => {
-  if (!touchInput.active || touchInput.pointerId !== e.pointerId) return;
+function endTouchControl(id = null) {
+  if (!touchInput.active) return;
+  if (id !== null && touchInput.pointerId !== id) return;
   const dx = touchInput.lastX - touchInput.startX;
   const dy = touchInput.lastY - touchInput.startY;
   const dist = Math.hypot(dx, dy);
@@ -4697,10 +4698,65 @@ const releaseTouchControl = (e) => {
   touchInput.pointerId = null;
   touchInput.axisX = 0;
   touchInput.axisY = 0;
-};
-canvas.addEventListener("pointerup", releaseTouchControl);
-canvas.addEventListener("pointercancel", releaseTouchControl);
-canvas.addEventListener("lostpointercapture", releaseTouchControl);
+}
+
+canvas.addEventListener("pointerdown", (e) => {
+  const started = beginTouchControl(e.clientX, e.clientY, e.pointerId);
+  if (!started) return;
+  try {
+    canvas.setPointerCapture(e.pointerId);
+  } catch {}
+});
+
+canvas.addEventListener("pointermove", (e) => {
+  if (touchInput.pointerId !== e.pointerId) return;
+  updateTouchControl(e.clientX, e.clientY);
+});
+
+canvas.addEventListener("pointerup", (e) => endTouchControl(e.pointerId));
+canvas.addEventListener("pointercancel", (e) => endTouchControl(e.pointerId));
+canvas.addEventListener("lostpointercapture", (e) =>
+  endTouchControl(e.pointerId),
+);
+
+// Fallback for mobile browsers that do not reliably dispatch pointer events.
+if (!("PointerEvent" in window)) {
+  canvas.addEventListener(
+    "touchstart",
+    (e) => {
+      const t = e.changedTouches[0];
+      if (!t) return;
+      if (beginTouchControl(t.clientX, t.clientY, t.identifier)) {
+        e.preventDefault();
+      }
+    },
+    { passive: false },
+  );
+
+  canvas.addEventListener(
+    "touchmove",
+    (e) => {
+      const t = Array.from(e.changedTouches).find(
+        (touch) => touch.identifier === touchInput.pointerId,
+      );
+      if (!t) return;
+      updateTouchControl(t.clientX, t.clientY);
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+
+  const endTouch = (e) => {
+    const t = Array.from(e.changedTouches).find(
+      (touch) => touch.identifier === touchInput.pointerId,
+    );
+    if (!t) return;
+    endTouchControl(t.identifier);
+    e.preventDefault();
+  };
+  canvas.addEventListener("touchend", endTouch, { passive: false });
+  canvas.addEventListener("touchcancel", endTouch, { passive: false });
+}
 
 resize();
 resetGame();
