@@ -14,6 +14,18 @@ const finalScore = document.getElementById("finalScore");
 const restartButton = document.getElementById("restartButton");
 const pauseButton = document.getElementById("pauseButton");
 const muteButton = document.getElementById("muteButton");
+const instructionsButton = document.getElementById("instructionsButton");
+const instructionsOverlay = document.getElementById("instructionsOverlay");
+const closeInstructionsButton = document.getElementById(
+  "closeInstructionsButton",
+);
+const gameHud = document.getElementById("gameHud");
+const startMenu = document.getElementById("startMenu");
+const startGameButton = document.getElementById("startGameButton");
+const readInstructionsButton = document.getElementById(
+  "readInstructionsButton",
+);
+const startInstructions = document.getElementById("startInstructions");
 
 const config = {
   maxLife: 3,
@@ -61,6 +73,8 @@ let probeWreckage = [];
 let shieldOrbs = [];
 let kuiperFragments = [];
 let cameraShake = 0;
+let gameStarted = false;
+let instructionsOpen = false;
 const audioMix = {
   master: 0.22,
   engine: 1.0,
@@ -108,6 +122,8 @@ function resetGame() {
   shieldOrbs = [];
   kuiperFragments = [];
   cameraShake = 0;
+  instructionsOpen = false;
+  if (instructionsOverlay) instructionsOverlay.classList.add("hidden");
   gameState = {
     score: 0,
     destroyed: 0,
@@ -493,7 +509,14 @@ function toggleAudioMute() {
 }
 
 function togglePause() {
-  if (!gameState || gameState.over || gameState.gameOverSequence) return;
+  if (
+    !gameStarted ||
+    instructionsOpen ||
+    !gameState ||
+    gameState.over ||
+    gameState.gameOverSequence
+  )
+    return;
   gameState.paused = !gameState.paused;
   updateControlButtons();
 }
@@ -508,11 +531,47 @@ function updateControlButtons() {
   }
 }
 
+function setGameStarted(started) {
+  gameStarted = started;
+  if (gameHud) gameHud.classList.toggle("hidden", !started);
+  if (startMenu) startMenu.classList.toggle("hidden", started);
+  if (gameState && started) gameState.paused = false;
+  updateControlButtons();
+}
+
+function startGame() {
+  resetGame();
+  setGameStarted(true);
+  ensureAudioStarted();
+}
+
+function openInstructionsOverlay() {
+  if (!gameStarted || !gameState || gameState.over) return;
+  instructionsOpen = true;
+  gameState.paused = true;
+  if (instructionsOverlay) instructionsOverlay.classList.remove("hidden");
+  updateControlButtons();
+}
+
+function closeInstructionsOverlay() {
+  instructionsOpen = false;
+  if (instructionsOverlay) instructionsOverlay.classList.add("hidden");
+  if (
+    gameStarted &&
+    gameState &&
+    !gameState.over &&
+    !gameState.gameOverSequence
+  ) {
+    gameState.paused = false;
+  }
+  updateControlButtons();
+}
+
 function updateAudio() {
   if (!audioState.ctx || !gameState) return;
   const now = audioState.ctx.currentTime;
   applyAudioMaster(now);
-  if (gameState.over || gameState.paused) {
+  if (!gameStarted || gameState.over || gameState.paused) {
     audioState.engineGain.gain.setTargetAtTime(0.0001, now, 0.2);
     audioState.staticGain.gain.setTargetAtTime(0.0001, now, 0.2);
     if (audioState.damagedGain) {
@@ -1354,6 +1413,7 @@ function spawnPlanet(type) {
 function shoot() {
   const ship = gameState.ship;
   if (
+    !gameStarted ||
     gameState.over ||
     gameState.paused ||
     ship.fireCooldown > 0 ||
@@ -1560,6 +1620,7 @@ function updateHud() {
 }
 
 function update(dt, rawDt = dt) {
+  if (!gameStarted) return;
   if (gameState.over || gameState.paused) return;
 
   const ship = gameState.ship;
@@ -3051,7 +3112,6 @@ function drawScreenEffects() {
     ctx.fill();
     ctx.restore();
   }
-
 }
 
 function drawCockpitOverlay() {
@@ -3866,14 +3926,14 @@ window.addEventListener("mousemove", (e) => {
   mouse.y = e.clientY;
 });
 window.addEventListener("mousedown", () => {
-  ensureAudioStarted();
   mouse.down = true;
 });
 window.addEventListener("mouseup", () => {
   mouse.down = false;
 });
 window.addEventListener("keydown", (e) => {
-  ensureAudioStarted();
+  if (gameStarted) ensureAudioStarted();
+  if (instructionsOpen && e.code !== "Escape") return;
   if (e.code === "Space") {
     e.preventDefault();
     if (
@@ -3889,16 +3949,33 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyP" && !e.repeat) {
     togglePause();
   }
+  if (e.code === "Escape" && instructionsOpen) {
+    closeInstructionsOverlay();
+  }
   keys[e.code] = true;
 });
 window.addEventListener("keyup", (e) => {
   keys[e.code] = false;
 });
 canvas.addEventListener("click", () => {
+  if (!gameStarted) return;
   ensureAudioStarted();
   shoot();
 });
 restartButton.addEventListener("click", resetGame);
+if (startGameButton)
+  startGameButton.addEventListener("click", () => {
+    startGame();
+    startGameButton.blur();
+  });
+if (readInstructionsButton && startInstructions)
+  readInstructionsButton.addEventListener("click", () => {
+    startInstructions.open = !startInstructions.open;
+    readInstructionsButton.textContent = startInstructions.open
+      ? "Hide Instructions"
+      : "Read Instructions";
+    readInstructionsButton.blur();
+  });
 if (pauseButton)
   pauseButton.addEventListener("click", () => {
     togglePause();
@@ -3909,7 +3986,18 @@ if (muteButton)
     toggleAudioMute();
     muteButton.blur();
   });
+if (instructionsButton)
+  instructionsButton.addEventListener("click", () => {
+    openInstructionsOverlay();
+    instructionsButton.blur();
+  });
+if (closeInstructionsButton)
+  closeInstructionsButton.addEventListener("click", () => {
+    closeInstructionsOverlay();
+    closeInstructionsButton.blur();
+  });
 
 resize();
 resetGame();
+setGameStarted(false);
 requestAnimationFrame(loop);
