@@ -2481,7 +2481,8 @@ function update(dt, rawDt = dt) {
       12 * nebula.depth;
     nebula.x -= speed * dt + ship.vx * dt * 0.018 * nebula.depth;
     nebula.y +=
-      nebula.verticalDrift * dt + Math.sin(nebula.speedPhase + gameState.elapsed * 0.18) * 2.4 * dt;
+      nebula.verticalDrift * dt +
+      Math.sin(nebula.speedPhase + gameState.elapsed * 0.18) * 2.4 * dt;
     nebula.y -= ship.vy * dt * 0.012 * nebula.depth;
     if (nebula.x < -nebula.radius - 120) {
       nebula.x = canvas.width + nebula.radius + 80;
@@ -2494,11 +2495,13 @@ function update(dt, rawDt = dt) {
   for (const cluster of starClusters) {
     const speed =
       cluster.driftSpeed +
-      Math.sin(gameState.elapsed * 0.42 + cluster.speedPhase) * cluster.speedVar +
+      Math.sin(gameState.elapsed * 0.42 + cluster.speedPhase) *
+        cluster.speedVar +
       20 * cluster.depth;
     cluster.x -= speed * dt + ship.vx * dt * 0.03 * cluster.depth;
     cluster.y +=
-      cluster.verticalDrift * dt + Math.sin(cluster.speedPhase + gameState.elapsed * 0.2) * 2.8 * dt;
+      cluster.verticalDrift * dt +
+      Math.sin(cluster.speedPhase + gameState.elapsed * 0.2) * 2.8 * dt;
     cluster.y -= ship.vy * dt * 0.016 * cluster.depth;
     cluster.twinkle += dt * (0.8 + cluster.depth);
     if (cluster.x < -cluster.radius - 80) {
@@ -2619,11 +2622,13 @@ function update(dt, rawDt = dt) {
   for (const exoplanet of exoplanets) {
     const speed =
       exoplanet.driftSpeed +
-      Math.sin(gameState.elapsed * 0.28 + exoplanet.speedPhase) * exoplanet.speedVar +
+      Math.sin(gameState.elapsed * 0.28 + exoplanet.speedPhase) *
+        exoplanet.speedVar +
       5 * exoplanet.depth;
     exoplanet.x -= speed * dt + ship.vx * dt * 0.008 * exoplanet.depth;
     exoplanet.y +=
-      exoplanet.verticalDrift * dt + Math.sin(exoplanet.speedPhase + gameState.elapsed * 0.13) * 1.6 * dt;
+      exoplanet.verticalDrift * dt +
+      Math.sin(exoplanet.speedPhase + gameState.elapsed * 0.13) * 1.6 * dt;
     exoplanet.y -= ship.vy * dt * 0.005 * exoplanet.depth;
     exoplanet.band += dt * (0.2 + exoplanet.depth * 0.35);
 
@@ -2683,7 +2688,8 @@ function update(dt, rawDt = dt) {
       8 * star.depth;
     star.x -= speed * dt + ship.vx * dt * 0.01 * star.depth;
     star.y +=
-      star.verticalDrift * dt + Math.sin(star.speedPhase + gameState.elapsed * 0.2) * 2.1 * dt;
+      star.verticalDrift * dt +
+      Math.sin(star.speedPhase + gameState.elapsed * 0.2) * 2.1 * dt;
     star.y -= ship.vy * dt * 0.006 * star.depth;
     star.spin += dt * 1.2;
     star.pulse += dt * (1.7 + star.depth);
@@ -2694,7 +2700,10 @@ function update(dt, rawDt = dt) {
     const influenceR = star.halo * 2.1;
     if (dist < influenceR) {
       const influence = Math.pow(Math.max(0, 1 - dist / influenceR), 1.6);
-      neutronInterferenceTarget = Math.max(neutronInterferenceTarget, influence);
+      neutronInterferenceTarget = Math.max(
+        neutronInterferenceTarget,
+        influence,
+      );
     }
 
     if (star.x < -star.halo - 120) {
@@ -2722,25 +2731,30 @@ function update(dt, rawDt = dt) {
       3.5 * planet.depth;
     planet.x -= speed * dt + ship.vx * dt * 0.006 * planet.depth;
     planet.y +=
-      planet.verticalDrift * dt + Math.sin(planet.speedPhase + gameState.elapsed * 0.11) * 1.2 * dt;
+      planet.verticalDrift * dt +
+      Math.sin(planet.speedPhase + gameState.elapsed * 0.11) * 1.2 * dt;
     planet.y -= ship.vy * dt * 0.004 * planet.depth;
     planet.spin += dt * (0.08 + planet.depth * 0.12);
     if (planet.x < -planet.ringOuter - 260) {
       planet.x = canvas.width + planet.ringOuter + 180;
       planet.y = canvas.height * (0.18 + Math.random() * 0.66);
     }
-    if (planet.y < -planet.ringOuter) planet.y = canvas.height + planet.ringOuter;
-    if (planet.y > canvas.height + planet.ringOuter) planet.y = -planet.ringOuter;
+    if (planet.y < -planet.ringOuter)
+      planet.y = canvas.height + planet.ringOuter;
+    if (planet.y > canvas.height + planet.ringOuter)
+      planet.y = -planet.ringOuter;
   }
 
   for (const remnant of supernovaRemnants) {
     const speed =
       remnant.driftSpeed +
-      Math.sin(gameState.elapsed * 0.18 + remnant.speedPhase) * remnant.speedVar +
+      Math.sin(gameState.elapsed * 0.18 + remnant.speedPhase) *
+        remnant.speedVar +
       2.2 * remnant.depth;
     remnant.x -= speed * dt + ship.vx * dt * 0.004 * remnant.depth;
     remnant.y +=
-      remnant.verticalDrift * dt + Math.sin(remnant.speedPhase + gameState.elapsed * 0.08) * 1.1 * dt;
+      remnant.verticalDrift * dt +
+      Math.sin(remnant.speedPhase + gameState.elapsed * 0.08) * 1.1 * dt;
     remnant.y -= ship.vy * dt * 0.003 * remnant.depth;
     remnant.pulse += dt * (0.35 + remnant.depth * 0.35);
     if (remnant.x < -remnant.shock - 340) {
@@ -3626,7 +3640,7 @@ function drawScreenEffects() {
     for (let i = 0; i < lines; i++) {
       const y = Math.random() * canvas.height;
       const len = canvas.width * (0.25 + Math.random() * 0.65);
-      const x = (Math.random() * (canvas.width - len));
+      const x = Math.random() * (canvas.width - len);
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + len, y + (Math.random() - 0.5) * 1.2);
@@ -4329,9 +4343,7 @@ function drawEntities() {
       ctx.lineTo(
         asteroid.radius * 0.9,
         y0 +
-          Math.sin(
-            asteroid.surfaceSeed * 1.4 + band * asteroid.striationFreq,
-          ) *
+          Math.sin(asteroid.surfaceSeed * 1.4 + band * asteroid.striationFreq) *
             asteroid.striationAmp *
             0.7,
       );
@@ -4645,7 +4657,12 @@ if (closeInstructionsButton)
   });
 
 function beginTouchControl(clientX, clientY, id = null) {
-  if (!isSmartphoneLike() || !gameStarted || orientationBlocked || instructionsOpen)
+  if (
+    !isSmartphoneLike() ||
+    !gameStarted ||
+    orientationBlocked ||
+    instructionsOpen
+  )
     return false;
   ensureAudioStarted();
   touchInput.active = true;
