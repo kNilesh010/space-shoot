@@ -363,6 +363,7 @@ function resetGame() {
     nextSurvivalBonusAt: 60,
     ammoBoostTimer: 0,
     ammoBoostTick: 0,
+    ammoRefillTimer: 0,
     eclipsePenalty: 0,
     neutronInterference: 0,
     paused: false,
@@ -1993,8 +1994,12 @@ function updateHud() {
   weaponBar.style.width = `${ammoPct}%`;
   lifeText.textContent = `${gameState.life} / ${config.maxLife}`;
   const ammoText = `${Math.floor(gameState.ammo)} / ${ammoCap}`;
-  weaponText.textContent =
-    gameState.ammoBoostTimer > 0 ? `${ammoText} BOOST` : ammoText;
+  if (isSmartphoneLike() && gameState.ammoRefillTimer > 0 && gameState.ammo <= 0) {
+    weaponText.textContent = `RECHARGE ${gameState.ammoRefillTimer.toFixed(1)}s`;
+  } else {
+    weaponText.textContent =
+      gameState.ammoBoostTimer > 0 ? `${ammoText} BOOST` : ammoText;
+  }
   consecutiveText.textContent = `${gameState.consecutiveHits} / 3`;
 
   if (gameState.life >= 3) {
@@ -2158,7 +2163,27 @@ function update(dt, rawDt = dt) {
     gameState.ammo = Math.min(getAmmoCap(), gameState.ammo);
   }
 
-  if ((mouse.down || keys.Space) && gameState.ammo > 0) shoot();
+  const mobileAutoFire = isSmartphoneLike() && touchInput.active;
+  if ((mouse.down || keys.Space || mobileAutoFire) && gameState.ammo > 0) {
+    shoot();
+  }
+
+  if (isSmartphoneLike()) {
+    if (gameState.ammo <= 0) {
+      if (gameState.ammoRefillTimer <= 0) {
+        gameState.ammoRefillTimer = 5;
+      } else {
+        gameState.ammoRefillTimer = Math.max(0, gameState.ammoRefillTimer - dt);
+        if (gameState.ammoRefillTimer <= 0) {
+          gameState.ammo = getAmmoCap();
+        }
+      }
+    } else {
+      gameState.ammoRefillTimer = 0;
+    }
+  } else {
+    gameState.ammoRefillTimer = 0;
+  }
 
   if (
     !gameState.advancedUnlocked &&
