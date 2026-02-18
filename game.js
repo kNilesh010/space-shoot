@@ -807,7 +807,6 @@ function startGame() {
   resetGame();
   setGameStarted(true);
   ensureAudioStarted();
-  enableMotionControlsFromGesture();
 }
 
 function openInstructionsOverlay() {
@@ -973,8 +972,11 @@ function updateAudio() {
 }
 
 function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  const mobile = isSmartphoneLike();
+  const shortSide = Math.min(window.innerWidth, window.innerHeight);
+  const renderScale = mobile ? (shortSide < 500 ? 1.28 : 1.18) : 1;
+  canvas.width = Math.floor(window.innerWidth * renderScale);
+  canvas.height = Math.floor(window.innerHeight * renderScale);
   if (!stars.length) {
     stars = Array.from({ length: 280 }, () => ({
       x: Math.random() * canvas.width,
@@ -2033,23 +2035,16 @@ function update(dt, rawDt = dt) {
     gameState.nextSurvivalBonusAt += 60;
   }
 
-  const motionActive = isSmartphoneLike() && motionInput.enabled;
-  const motionFresh =
-    motionActive && performance.now() - motionInput.lastEventAt <= 420;
-  const motionAxisX = motionFresh ? motionInput.axisX : 0;
-  const motionAxisY = motionFresh ? motionInput.axisY : 0;
-  const touchAxisX =
-    !motionActive && touchInput.active ? touchInput.axisX : 0;
-  const touchAxisY =
-    !motionActive && touchInput.active ? touchInput.axisY : 0;
+  const touchAxisX = touchInput.active ? touchInput.axisX : 0;
+  const touchAxisY = touchInput.active ? touchInput.axisY : 0;
 
   const up = keys.KeyW || keys.ArrowUp;
   const down = keys.KeyS || keys.ArrowDown;
   const left = keys.KeyA || keys.ArrowLeft;
   const right = keys.KeyD || keys.ArrowRight;
 
-  const axisX = (right ? 1 : 0) - (left ? 1 : 0) + touchAxisX + motionAxisX;
-  const axisY = (down ? 1 : 0) - (up ? 1 : 0) + touchAxisY + motionAxisY;
+  const axisX = (right ? 1 : 0) - (left ? 1 : 0) + touchAxisX;
+  const axisY = (down ? 1 : 0) - (up ? 1 : 0) + touchAxisY;
   const moving = Math.hypot(axisX, axisY) > 0.06;
   const boosting = (keys.ShiftLeft || keys.ShiftRight) && moving;
   ship.boosting = boosting;
@@ -2110,7 +2105,7 @@ function update(dt, rawDt = dt) {
     (mouse.down || (mouse.hasMoved && nowMs - mouse.lastMoveAt < 2200)) &&
     !touchInput.active;
   let targetAngle = ship.angle;
-  if ((touchInput.active || motionActive) && Math.hypot(axisX, axisY) > 0.08) {
+  if (touchInput.active && Math.hypot(axisX, axisY) > 0.08) {
     targetAngle = Math.atan2(axisY, axisX);
   } else if (mouseActive) {
     targetAngle = Math.atan2(mouse.y - ship.y, mouse.x - ship.x);
@@ -4840,13 +4835,6 @@ function beginTouchControl(clientX, clientY, id = null) {
   )
     return false;
   ensureAudioStarted();
-  if (
-    !motionInput.enabled &&
-    motionInput.available &&
-    motionInput.permissionState !== "denied"
-  ) {
-    enableMotionControlsFromGesture();
-  }
   touchInput.active = true;
   touchInput.pointerId = id;
   touchInput.startX = clientX;
@@ -4863,7 +4851,6 @@ function updateTouchControl(clientX, clientY) {
   if (!touchInput.active) return;
   touchInput.lastX = clientX;
   touchInput.lastY = clientY;
-  if (motionInput.enabled && isSmartphoneLike()) return;
   const dx = clientX - touchInput.startX;
   const dy = clientY - touchInput.startY;
   const dead = 8;
