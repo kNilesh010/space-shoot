@@ -257,12 +257,6 @@ body {
   font-size: clamp(0.85rem, 2vw, 1rem);
 }
 
-@media (pointer: coarse) {
-  #fullscreenButton {
-    display: none;
-  }
-}
-
 .overlay {
   position: fixed;
   inset: 0;

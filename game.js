@@ -93,6 +93,18 @@ const touchInput = {
   lastY: 0,
   startAt: 0,
 };
+const motionInput = {
+  available: typeof window !== "undefined" && "DeviceOrientationEvent" in window,
+  listenerAttached: false,
+  enabled: false,
+  permissionState: "unknown",
+  axisX: 0,
+  axisY: 0,
+  baseTiltX: 0,
+  baseTiltY: 0,
+  calibrated: false,
+  lastEventAt: 0,
+};
 const audioMix = {
   master: 0.22,
   engine: 1.0,
@@ -123,6 +135,93 @@ let audioState = {
   sirenOsc: null,
   sirenGain: null,
 };
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getScreenAngle() {
+  if (screen.orientation && typeof screen.orientation.angle === "number") {
+    return screen.orientation.angle;
+  }
+  if (typeof window.orientation === "number") return window.orientation;
+  return window.innerWidth >= window.innerHeight ? 90 : 0;
+}
+
+function orientationTiltToAxes(beta = 0, gamma = 0) {
+  const angle = ((Math.round(getScreenAngle() / 90) * 90) % 360 + 360) % 360;
+  if (angle === 90) return { x: beta, y: -gamma };
+  if (angle === 270) return { x: -beta, y: gamma };
+  if (angle === 180) return { x: -gamma, y: -beta };
+  return { x: gamma, y: beta };
+}
+
+function resetMotionInput(recalibrate = true) {
+  motionInput.axisX = 0;
+  motionInput.axisY = 0;
+  motionInput.lastEventAt = 0;
+  if (recalibrate) {
+    motionInput.baseTiltX = 0;
+    motionInput.baseTiltY = 0;
+    motionInput.calibrated = false;
+  }
+}
+
+function onDeviceOrientation(event) {
+  if (!motionInput.enabled || orientationBlocked) {
+    resetMotionInput();
+    return;
+  }
+  if (typeof event.beta !== "number" || typeof event.gamma !== "number") return;
+  const tilt = orientationTiltToAxes(event.beta, event.gamma);
+  if (!motionInput.calibrated) {
+    motionInput.baseTiltX = tilt.x;
+    motionInput.baseTiltY = tilt.y;
+    motionInput.calibrated = true;
+  }
+  const deadZone = 2.2;
+  const maxTilt = 18;
+  const deltaX = tilt.x - motionInput.baseTiltX;
+  const deltaY = tilt.y - motionInput.baseTiltY;
+  motionInput.axisX =
+    Math.abs(deltaX) < deadZone ? 0 : clamp(deltaX / maxTilt, -1, 1);
+  motionInput.axisY =
+    Math.abs(deltaY) < deadZone ? 0 : clamp(deltaY / maxTilt, -1, 1);
+  motionInput.lastEventAt = performance.now();
+}
+
+async function enableMotionControlsFromGesture() {
+  if (!isSmartphoneLike() || !motionInput.available) {
+    motionInput.enabled = false;
+    return false;
+  }
+  let granted = true;
+  const deviceOrientation = window.DeviceOrientationEvent;
+  if (
+    deviceOrientation &&
+    typeof deviceOrientation.requestPermission === "function"
+  ) {
+    try {
+      const permission = await deviceOrientation.requestPermission();
+      granted = permission === "granted";
+    } catch {
+      granted = false;
+    }
+  }
+  motionInput.permissionState = granted ? "granted" : "denied";
+  if (!granted) {
+    motionInput.enabled = false;
+    resetMotionInput();
+    return false;
+  }
+  if (!motionInput.listenerAttached) {
+    window.addEventListener("deviceorientation", onDeviceOrientation, true);
+    motionInput.listenerAttached = true;
+  }
+  motionInput.enabled = true;
+  resetMotionInput(true);
+  return true;
+}
 
 function resetSceneVisuals() {
   stars = Array.from({ length: 280 }, () => ({
@@ -169,6 +268,7 @@ function resetGame() {
   touchInput.lastX = 0;
   touchInput.lastY = 0;
   touchInput.startAt = 0;
+  resetMotionInput();
   resetSceneVisuals();
   instructionsOpen = false;
   if (instructionsOverlay) instructionsOverlay.classList.add("hidden");
@@ -648,6 +748,7 @@ function applyLandscapeLock() {
     touchInput.axisX = 0;
     touchInput.axisY = 0;
     touchInput.pointerId = null;
+    resetMotionInput();
   } else if (orientationBlocked) {
     orientationBlocked = false;
     if (
@@ -676,6 +777,7 @@ function startGame() {
   resetGame();
   setGameStarted(true);
   ensureAudioStarted();
+  enableMotionControlsFromGesture();
 }
 
 function openInstructionsOverlay() {
@@ -1901,16 +2003,23 @@ function update(dt, rawDt = dt) {
     gameState.nextSurvivalBonusAt += 60;
   }
 
-  const touchAxisX = touchInput.active ? touchInput.axisX : 0;
-  const touchAxisY = touchInput.active ? touchInput.axisY : 0;
+  const motionActive = isSmartphoneLike() && motionInput.enabled;
+  const motionFresh =
+    motionActive && performance.now() - motionInput.lastEventAt <= 420;
+  const motionAxisX = motionFresh ? motionInput.axisX : 0;
+  const motionAxisY = motionFresh ? motionInput.axisY : 0;
+  const touchAxisX =
+    !motionActive && touchInput.active ? touchInput.axisX : 0;
+  const touchAxisY =
+    !motionActive && touchInput.active ? touchInput.axisY : 0;
 
   const up = keys.KeyW || keys.ArrowUp;
   const down = keys.KeyS || keys.ArrowDown;
   const left = keys.KeyA || keys.ArrowLeft;
   const right = keys.KeyD || keys.ArrowRight;
 
-  const axisX = (right ? 1 : 0) - (left ? 1 : 0) + touchAxisX;
-  const axisY = (down ? 1 : 0) - (up ? 1 : 0) + touchAxisY;
+  const axisX = (right ? 1 : 0) - (left ? 1 : 0) + touchAxisX + motionAxisX;
+  const axisY = (down ? 1 : 0) - (up ? 1 : 0) + touchAxisY + motionAxisY;
   const moving = Math.hypot(axisX, axisY) > 0.06;
   const boosting = (keys.ShiftLeft || keys.ShiftRight) && moving;
   ship.boosting = boosting;
@@ -1971,7 +2080,7 @@ function update(dt, rawDt = dt) {
     (mouse.down || (mouse.hasMoved && nowMs - mouse.lastMoveAt < 2200)) &&
     !touchInput.active;
   let targetAngle = ship.angle;
-  if (touchInput.active && Math.hypot(axisX, axisY) > 0.08) {
+  if ((touchInput.active || motionActive) && Math.hypot(axisX, axisY) > 0.08) {
     targetAngle = Math.atan2(axisY, axisX);
   } else if (mouseActive) {
     targetAngle = Math.atan2(mouse.y - ship.y, mouse.x - ship.x);
@@ -4717,6 +4826,7 @@ function updateTouchControl(clientX, clientY) {
   if (!touchInput.active) return;
   touchInput.lastX = clientX;
   touchInput.lastY = clientY;
+  if (motionInput.enabled && isSmartphoneLike()) return;
   const dx = clientX - touchInput.startX;
   const dy = clientY - touchInput.startY;
   const dead = 8;
