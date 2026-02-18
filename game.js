@@ -140,6 +140,20 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function viewportToCanvas(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = rect.width > 0 ? canvas.width / rect.width : 1;
+  const sy = rect.height > 0 ? canvas.height / rect.height : 1;
+  return {
+    x: (clientX - rect.left) * sx,
+    y: (clientY - rect.top) * sy,
+  };
+}
+
+function getInputScale() {
+  return window.innerWidth > 0 ? canvas.width / window.innerWidth : 1;
+}
+
 function getScreenAngle() {
   if (screen.orientation && typeof screen.orientation.angle === "number") {
     return screen.orientation.angle;
@@ -2106,7 +2120,13 @@ function update(dt, rawDt = dt) {
     !touchInput.active;
   let targetAngle = ship.angle;
   if (touchInput.active && Math.hypot(axisX, axisY) > 0.08) {
-    targetAngle = Math.atan2(axisY, axisX);
+    const touchAimDx = touchInput.lastX - ship.x;
+    const touchAimDy = touchInput.lastY - ship.y;
+    if (Math.hypot(touchAimDx, touchAimDy) > 18) {
+      targetAngle = Math.atan2(touchAimDy, touchAimDx);
+    } else {
+      targetAngle = Math.atan2(axisY, axisX);
+    }
   } else if (mouseActive) {
     targetAngle = Math.atan2(mouse.y - ship.y, mouse.x - ship.x);
   } else if (Math.hypot(ship.vx, ship.vy) > 18) {
@@ -2115,7 +2135,8 @@ function update(dt, rawDt = dt) {
   let delta = targetAngle - ship.angle;
   while (delta > Math.PI) delta -= Math.PI * 2;
   while (delta < -Math.PI) delta += Math.PI * 2;
-  ship.angle += delta * Math.min(1, dt * 14);
+  const turnResponsiveness = touchInput.active ? 9.5 : 14;
+  ship.angle += delta * Math.min(1, dt * turnResponsiveness);
   ship.fireCooldown = Math.max(0, ship.fireCooldown - dt);
   ship.invulnerableFor = Math.max(0, ship.invulnerableFor - dt);
   ship.wormholeCooldown = Math.max(0, ship.wormholeCooldown - dt);
@@ -4740,8 +4761,9 @@ window.addEventListener("resize", () => {
   applyLandscapeLock();
 });
 window.addEventListener("mousemove", (e) => {
-  mouse.x = e.clientX;
-  mouse.y = e.clientY;
+  const p = viewportToCanvas(e.clientX, e.clientY);
+  mouse.x = p.x;
+  mouse.y = p.y;
   mouse.hasMoved = true;
   mouse.lastMoveAt = performance.now();
 });
@@ -4835,12 +4857,13 @@ function beginTouchControl(clientX, clientY, id = null) {
   )
     return false;
   ensureAudioStarted();
+  const p = viewportToCanvas(clientX, clientY);
   touchInput.active = true;
   touchInput.pointerId = id;
-  touchInput.startX = clientX;
-  touchInput.startY = clientY;
-  touchInput.lastX = clientX;
-  touchInput.lastY = clientY;
+  touchInput.startX = p.x;
+  touchInput.startY = p.y;
+  touchInput.lastX = p.x;
+  touchInput.lastY = p.y;
   touchInput.startAt = performance.now();
   touchInput.axisX = 0;
   touchInput.axisY = 0;
@@ -4849,12 +4872,14 @@ function beginTouchControl(clientX, clientY, id = null) {
 
 function updateTouchControl(clientX, clientY) {
   if (!touchInput.active) return;
-  touchInput.lastX = clientX;
-  touchInput.lastY = clientY;
-  const dx = clientX - touchInput.startX;
-  const dy = clientY - touchInput.startY;
-  const dead = 8;
-  const scale = 68;
+  const p = viewportToCanvas(clientX, clientY);
+  touchInput.lastX = p.x;
+  touchInput.lastY = p.y;
+  const dx = p.x - touchInput.startX;
+  const dy = p.y - touchInput.startY;
+  const inputScale = getInputScale();
+  const dead = 8 * inputScale;
+  const scale = 68 * inputScale;
   touchInput.axisX = Math.max(
     -1,
     Math.min(1, Math.abs(dx) < dead ? 0 : dx / scale),
@@ -4872,11 +4897,12 @@ function endTouchControl(id = null) {
   const dy = touchInput.lastY - touchInput.startY;
   const dist = Math.hypot(dx, dy);
   const duration = performance.now() - touchInput.startAt;
+  const tapDist = 18 * getInputScale();
   if (
     gameStarted &&
     !orientationBlocked &&
     !instructionsOpen &&
-    dist < 18 &&
+    dist < tapDist &&
     duration < 260
   ) {
     shoot();
