@@ -148,6 +148,23 @@ function getScreenAngle() {
   return window.innerWidth >= window.innerHeight ? 90 : 0;
 }
 
+function isFullscreenActive() {
+  return !!(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.msFullscreenElement
+  );
+}
+
+function hasFullscreenSupport() {
+  const root = document.documentElement;
+  return !!(
+    root.requestFullscreen ||
+    root.webkitRequestFullscreen ||
+    root.msRequestFullscreen
+  );
+}
+
 function orientationTiltToAxes(beta = 0, gamma = 0) {
   const angle = ((Math.round(getScreenAngle() / 90) * 90) % 360 + 360) % 360;
   if (angle === 90) return { x: beta, y: -gamma };
@@ -205,7 +222,9 @@ async function enableMotionControlsFromGesture() {
       const permission = await deviceOrientation.requestPermission();
       granted = permission === "granted";
     } catch {
-      granted = false;
+      motionInput.permissionState = "unknown";
+      motionInput.enabled = false;
+      return false;
     }
   }
   motionInput.permissionState = granted ? "granted" : "denied";
@@ -216,6 +235,7 @@ async function enableMotionControlsFromGesture() {
   }
   if (!motionInput.listenerAttached) {
     window.addEventListener("deviceorientation", onDeviceOrientation, true);
+    window.addEventListener("deviceorientationabsolute", onDeviceOrientation, true);
     motionInput.listenerAttached = true;
   }
   motionInput.enabled = true;
@@ -687,13 +707,14 @@ function updateControlButtons() {
     muteButton.setAttribute("aria-label", muted ? "Unmute" : "Mute");
   }
   if (fullscreenButton) {
-    const fs = !!document.fullscreenElement;
+    const fs = isFullscreenActive();
     fullscreenButton.textContent = "⛶";
     fullscreenButton.title = fs ? "Exit Fullscreen" : "Fullscreen";
     fullscreenButton.setAttribute(
       "aria-label",
       fs ? "Exit Fullscreen" : "Fullscreen",
     );
+    fullscreenButton.classList.toggle("hidden", !hasFullscreenSupport());
   }
   if (instructionsButton) {
     instructionsButton.textContent = "ℹ";
@@ -703,19 +724,24 @@ function updateControlButtons() {
 }
 
 async function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    await document.documentElement.requestFullscreen();
-  } else {
-    await document.exitFullscreen();
+  const root = document.documentElement;
+  const request =
+    root.requestFullscreen ||
+    root.webkitRequestFullscreen ||
+    root.msRequestFullscreen;
+  const exit =
+    document.exitFullscreen ||
+    document.webkitExitFullscreen ||
+    document.msExitFullscreen;
+  if (!isFullscreenActive()) {
+    if (request) await request.call(root);
+  } else if (exit) {
+    await exit.call(document);
   }
 }
 
 function isTouchLandscapeMode() {
-  return (
-    window.matchMedia &&
-    window.matchMedia("(pointer: coarse)").matches &&
-    window.innerWidth <= 1100
-  );
+  return isSmartphoneLike();
 }
 
 function isPortrait() {
@@ -723,10 +749,14 @@ function isPortrait() {
 }
 
 function isSmartphoneLike() {
+  const ua = navigator.userAgent || "";
+  const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  const coarsePointer =
+    (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+    navigator.maxTouchPoints > 0;
   return (
-    window.matchMedia &&
-    window.matchMedia("(pointer: coarse)").matches &&
-    window.innerWidth <= 1100
+    coarsePointer &&
+    (mobileUA || window.innerWidth <= 1366 || window.innerHeight <= 1366)
   );
 }
 
@@ -4810,6 +4840,13 @@ function beginTouchControl(clientX, clientY, id = null) {
   )
     return false;
   ensureAudioStarted();
+  if (
+    !motionInput.enabled &&
+    motionInput.available &&
+    motionInput.permissionState !== "denied"
+  ) {
+    enableMotionControlsFromGesture();
+  }
   touchInput.active = true;
   touchInput.pointerId = id;
   touchInput.startX = clientX;
@@ -4882,6 +4919,7 @@ canvas.addEventListener("lostpointercapture", (e) =>
   endTouchControl(e.pointerId),
 );
 document.addEventListener("fullscreenchange", updateControlButtons);
+document.addEventListener("webkitfullscreenchange", updateControlButtons);
 
 // Fallback for mobile browsers that do not reliably dispatch pointer events.
 if (!("PointerEvent" in window)) {
