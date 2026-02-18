@@ -14,6 +14,7 @@ const finalScore = document.getElementById("finalScore");
 const restartButton = document.getElementById("restartButton");
 const pauseButton = document.getElementById("pauseButton");
 const muteButton = document.getElementById("muteButton");
+const fullscreenButton = document.getElementById("fullscreenButton");
 const instructionsButton = document.getElementById("instructionsButton");
 const instructionsOverlay = document.getElementById("instructionsOverlay");
 const closeInstructionsButton = document.getElementById(
@@ -574,11 +575,38 @@ function togglePause() {
 
 function updateControlButtons() {
   if (pauseButton) {
-    pauseButton.textContent =
-      gameState && gameState.paused ? "Resume" : "Pause";
+    const paused = !!(gameState && gameState.paused);
+    pauseButton.textContent = paused ? "▶" : "⏸";
+    pauseButton.title = paused ? "Resume" : "Pause";
+    pauseButton.setAttribute("aria-label", paused ? "Resume" : "Pause");
   }
   if (muteButton) {
-    muteButton.textContent = audioMix.muted ? "Unmute" : "Mute";
+    const muted = !!audioMix.muted;
+    muteButton.textContent = muted ? "🔇" : "🔊";
+    muteButton.title = muted ? "Unmute" : "Mute";
+    muteButton.setAttribute("aria-label", muted ? "Unmute" : "Mute");
+  }
+  if (fullscreenButton) {
+    const fs = !!document.fullscreenElement;
+    fullscreenButton.textContent = "⛶";
+    fullscreenButton.title = fs ? "Exit Fullscreen" : "Fullscreen";
+    fullscreenButton.setAttribute(
+      "aria-label",
+      fs ? "Exit Fullscreen" : "Fullscreen",
+    );
+  }
+  if (instructionsButton) {
+    instructionsButton.textContent = "ℹ";
+    instructionsButton.title = "Instructions";
+    instructionsButton.setAttribute("aria-label", "Instructions");
+  }
+}
+
+async function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    await document.documentElement.requestFullscreen();
+  } else {
+    await document.exitFullscreen();
   }
 }
 
@@ -4645,6 +4673,14 @@ if (muteButton)
     toggleAudioMute();
     muteButton.blur();
   });
+if (fullscreenButton)
+  fullscreenButton.addEventListener("click", async () => {
+    try {
+      await toggleFullscreen();
+    } catch {}
+    updateControlButtons();
+    fullscreenButton.blur();
+  });
 if (instructionsButton)
   instructionsButton.addEventListener("click", () => {
     openInstructionsOverlay();
@@ -4735,6 +4771,7 @@ canvas.addEventListener("pointercancel", (e) => endTouchControl(e.pointerId));
 canvas.addEventListener("lostpointercapture", (e) =>
   endTouchControl(e.pointerId),
 );
+document.addEventListener("fullscreenchange", updateControlButtons);
 
 // Fallback for mobile browsers that do not reliably dispatch pointer events.
 if (!("PointerEvent" in window)) {
